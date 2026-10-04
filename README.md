@@ -69,3 +69,12 @@ Avant lancement : vérifier le domaine canonique et ses redirections HTTPS/www, 
 Références : [variables système Vercel](https://vercel.com/docs/environment-variables/system-environment-variables), [Google : créer un sitemap](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap), [directives robots](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag), [SEO et JavaScript](https://developers.google.com/search/docs/crawling-indexing/javascript/javascript-seo-basics).
 
 Validation SEO : compilation réussie, 13 tests réussis (dont sitemap, previews et domaine stable Vercel), pages publiques et retour à l’application vérifiés dans le navigateur. Le sitemap est absent en local tant qu’aucune adresse de production n’est définie.
+
+## Services provisionnés
+
+Production : https://gaming-copilot.vercel.app — dépôt GitHub connecté à Vercel, branche main.
+Firebase : gaming-copilot-adrien, application Gaming Copilot Web, Firestore Standard (default) en europe-west9 (Paris). Google Sign-in activé ; localhost, 127.0.0.1 et gaming-copilot.vercel.app sont autorisés en plus des domaines Firebase. La configuration effective des domaines a été appliquée via l’API Authentication, car deploy --only auth ne les synchronise pas.
+
+Les sept variables Firebase sont chiffrées sur Vercel pour production, preview et développement. L’accès serveur utilise un compte dédié avec roles/datastore.user et roles/firebaseauth.viewer (vérification des sessions révoquées), sans rôle propriétaire. Le fichier .env.local reste ignoré par Git. Les fonctions Vercel sont configurées en cdg1.
+
+Validation : compilation Vercel réussie, API health 200, sitemap et robots.txt vérifiés sur le domaine réel, page inconnue 404, lecture Firestore anonyme refusée (403), accès serveur Firestore/Auth vérifiés. OPENAI_API_KEY et OPENAI_MODEL ne sont pas configurés : l’API assistant répond explicitement 503 tant qu’ils manquent. Les sources de prix restent à connecter.

@@ -1,6 +1,6 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, type Transaction } from "firebase-admin/firestore";
 export function admin() {
   const {
     FIREBASE_PROJECT_ID: projectId,
@@ -24,7 +24,7 @@ export async function consumeQuota(uid: string) {
   const { db } = admin();
   const day = new Date().toISOString().slice(0, 10);
   const ref = db.doc(`users/${uid}/privateUsage/${day}`);
-  await db.runTransaction(async (tx) => {
+  await db.runTransaction(async (tx: Transaction) => {
     const data = await tx.get(ref);
     const count = data.data()?.count ?? 0;
     if (count >= 30) throw Error("QUOTA_EXCEEDED");

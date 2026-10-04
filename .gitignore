@@ -10,3 +10,6 @@ public/decouvrir/
 public/guides/
 public/robots.txt
 public/sitemap.xml
+
+.vercel
+.env*.local

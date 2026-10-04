@@ -89,5 +89,6 @@
       ]
     }
   ],
-  "trailingSlash": false
+  "trailingSlash": false,
+  "regions": ["cdg1"]
 }

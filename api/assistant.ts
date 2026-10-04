@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import OpenAI from "openai";
 import { z } from "zod";
-import { admin, consumeQuota } from "../server/admin";
-import { executeTool, toolDefinitions } from "../server/tools";
-import { configSchema, emptyConfig } from "../src/domain";
+import { admin, consumeQuota } from "../server/admin.js";
+import { executeTool, toolDefinitions } from "../server/tools.js";
+import { configSchema, emptyConfig } from "../src/domain.js";
 const requestSchema = z
   .object({ message: z.string().trim().min(1).max(2000) })
   .strict();
@@ -97,12 +97,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
     }
-    return res
-      .status(502)
-      .json({
-        error:
-          "L’assistant a atteint sa limite d’étapes. Reformulez votre question.",
-      });
+    return res.status(502).json({
+      error:
+        "L’assistant a atteint sa limite d’étapes. Reformulez votre question.",
+    });
   } catch (e) {
     const code = e instanceof Error ? e.message : "";
     if (code === "QUOTA_EXCEEDED")

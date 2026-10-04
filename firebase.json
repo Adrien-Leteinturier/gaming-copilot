@@ -1,1 +1,28 @@
-{"firestore":{"rules":"firestore.rules","indexes":"firestore.indexes.json"},"emulators":{"auth":{"port":9099},"firestore":{"port":8080}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8080
+    }
+  },
+  "auth": {
+    "authorizedDomains": [
+      "localhost",
+      "127.0.0.1",
+      "gaming-copilot-adrien.firebaseapp.com",
+      "gaming-copilot.vercel.app"
+    ],
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Gaming Copilot",
+        "supportEmail": "adrienleteinturier@gmail.com"
+      }
+    }
+  }
+}
