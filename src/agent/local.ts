@@ -93,9 +93,9 @@ export async function localReply(
         messages: localMessages(question, history, context),
         stream: true,
         max_tokens: 600,
-        temperature: 0.7,
+        temperature: 0.2,
         ...(activeEngine.modelId?.includes(modelIds.light)
-          ? { extra_body: { enable_thinking: false }, presence_penalty: 1.5 }
+          ? { extra_body: { enable_thinking: false }, presence_penalty: 0 }
           : {}),
       });
       let text = "";

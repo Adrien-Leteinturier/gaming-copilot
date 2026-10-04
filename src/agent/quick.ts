@@ -20,5 +20,15 @@ export async function quickReply(
       );
     return `Offres relevées pour ${query} :\n\n${lines.join("\n\n")}\n\nCouverture partielle. Vérifiez la variante, le vendeur et les frais de port ; la page Prix permet d’ouvrir les offres. Ces prix viennent des sources marchandes, pas du modèle.`;
   }
-  return groundedDiagnostic(question, config);
+  const diagnostic = groundedDiagnostic(question, config);
+  if (diagnostic) return diagnostic;
+  if (/r[oô]le|sert|fonction|qu.est.ce|c.est quoi|explique/i.test(question)) {
+    if (/\bRAM\b|m[eé]moire vive/i.test(question))
+      return "La RAM est la mémoire de travail temporaire du PC. Elle contient les données et programmes en cours d’utilisation pour que le processeur y accède rapidement. Son contenu disparaît lorsque le PC s’éteint ; les fichiers conservés restent sur le SSD ou le disque. Un manque de RAM peut provoquer des ralentissements, mais en ajouter ne garantit pas davantage de FPS.";
+    if (/processeur|\bCPU\b/i.test(question))
+      return "Le processeur (CPU) exécute les instructions des programmes. Dans un jeu, il traite notamment la logique, la physique et les actions des personnages, puis prépare du travail pour la carte graphique. Le GPU calcule l’image affichée. La fluidité dépend de l’ensemble du PC et du jeu : le nom du CPU seul ne permet pas de prédire les FPS.";
+    if (/carte graphique|\bGPU\b/i.test(question))
+      return "La carte graphique (GPU) calcule les images du jeu : géométrie, textures, éclairage et effets. Une résolution ou une qualité visuelle plus élevée peut demander davantage de travail au GPU. Le processeur, la mémoire et le jeu influencent aussi la fluidité ; aucune performance mesurée ne peut être déduite du nom de la carte seul.";
+  }
+  return null;
 }
