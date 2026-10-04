@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function signedIn() { return request.auth != null; }
+  function owns() { return signedIn() && resource.data.ownerId == request.auth.uid; }
+  function validOwner() { return signedIn() && request.resource.data.ownerId == request.auth.uid; }
+  match /users/{uid} {
+   allow read, delete: if signedIn() && uid == request.auth.uid;
+   allow create, update: if signedIn() && uid == request.auth.uid && validOwner() && request.resource.data.keys().hasOnly(['ownerId','updatedAt']);
+  }
+  match /pcConfigs/{uid} {
+   allow read, delete: if signedIn() && uid == request.auth.uid;
+   allow create, update: if signedIn() && uid == request.auth.uid && validOwner() && request.resource.data.keys().hasOnly(['ownerId','config','updatedAt']) && request.resource.data.config is map;
+  }
+  match /conversations/{uid} {
+   allow read, delete: if signedIn() && uid == request.auth.uid;
+   allow create, update: if signedIn() && uid == request.auth.uid && validOwner() && request.resource.data.keys().hasOnly(['ownerId','messages','updatedAt']) && request.resource.data.messages is list && request.resource.data.messages.size() <= 50;
+  }
+  match /priceAlerts/{id} {
+   allow read, delete: if owns();
+   allow create: if validOwner() && request.resource.data.keys().hasOnly(['ownerId','alert']) && request.resource.data.alert.target is number && request.resource.data.alert.target > 0 && request.resource.data.alert.currency == 'EUR' && request.resource.data.alert.status == 'pending-provider';
+   allow update: if false;
+  }
+  match /priceHistory/{id} {
+   allow read: if owns();
+   allow write: if false;
+  }
+  match /{document=**} { allow read, write: if false; }
+ }
+}
