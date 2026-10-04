@@ -20,7 +20,7 @@ export const upgradeCatalog = [
   },
 ] as const;
 export function isAdviceQuestion(question: string) {
-  return /optimal|optimis|que.*penses|avis.*(?:config|setup)|conseil|recommand|meilleur|am[eé]lior|upgrade|quel.*(?:matos|mat[eé]riel|composant|carte graphique)|r[eé]gl.*(?:jeu|1440|1080|4k)/i.test(
+  return /optimal|id[eé]al|optimis|que.*penses|avis.*(?:config|setup)|conseil|recommand|meilleur|am[eé]lior|upgrade|quel.*(?:matos|mat[eé]riel|composant|carte graphique|config|setup|\bGPU\b)|r[eé]gl.*(?:jeu|1440|1080|4k)/i.test(
     question,
   );
 }

@@ -56,3 +56,13 @@ test("budget follow-up retains prior resolution and never borrows unrelated advi
     null,
   );
 });
+
+test("visitor's exact ideal setup question routes to hardware-grounded advice", async () => {
+  const reply = await quickReply(
+    "Quel serait ma config ideale sur un ecran 1440p",
+    rig,
+  );
+  assert.match(reply!, /5700X/);
+  assert.match(reply!, /RX 9060 XT/);
+  assert.match(reply!, /alimentation n’est pas renseignée/);
+});
