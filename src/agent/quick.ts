@@ -1,9 +1,35 @@
-import type { PcConfig } from "../domain";
+import { adviceQuestion, buildSetupAdvice } from "./advice";
+import type { Message, PcConfig } from "../domain";
 import { priceQueryFrom, groundedDiagnostic } from "./context";
 export async function quickReply(
   question: string,
   config: PcConfig,
+  history: Message[] = [],
 ): Promise<string | null> {
+  const adviceIntent = adviceQuestion(question, history);
+  if (adviceIntent) {
+    const advice = buildSetupAdvice(adviceIntent, config);
+    if (!advice.budget || !advice.candidates.length) return advice.text;
+    const { findPrices } = await import("../prices");
+    const results = await Promise.allSettled(
+      advice.candidates.map((query) => findPrices(query)),
+    );
+    const prices = results.map((result, i) => {
+      if (result.status === "rejected")
+        return `${advice.candidates[i]} : recherche indisponible, aucun prix inventé.`;
+      const cheapest = result.value.offers
+        .filter((o) => /(?:9070\s*XT|5070\s*Ti)/i.test(o.component))
+        .sort((a, b) => a.amount - b.amount)[0];
+      if (!cheapest)
+        return `${advice.candidates[i]} : aucune offre vérifiable dans les sources consultées.`;
+      return `${advice.candidates[i]} : ${cheapest.amount.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })} hors livraison chez ${cheapest.merchant} — ${cheapest.amount <= advice.budget! ? "dans le budget annoncé hors frais supplémentaires" : "au-dessus du budget annoncé"}. Offre : ${cheapest.url} (relevée le ${new Date(cheapest.observedAt).toLocaleString("fr-FR")}).`;
+    });
+    return (
+      advice.text +
+      "\n\nOffres vérifiées à cet instant (couverture partielle) :\n" +
+      prices.join("\n")
+    );
+  }
   if (/prix|co[uû]t|tarif|offres?/i.test(question)) {
     const query = priceQueryFrom(question, config);
     if (!query)

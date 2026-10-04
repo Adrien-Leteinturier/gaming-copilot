@@ -1,3 +1,4 @@
+import { buildSetupAdvice } from "./advice";
 import { z } from "zod";
 import type { PcConfig } from "../domain";
 export type PriceQuote = {
@@ -104,7 +105,8 @@ export async function executeTool(
       };
     case "recommendUpgrade":
       return {
-        status: "needs-evidence",
+        status: "conditional-advice",
+        advice: buildSetupAdvice(parsed.query ?? "Quel upgrade ?", config),
         goal: parsed.query,
         steps: [
           "Préciser les jeux et le budget",

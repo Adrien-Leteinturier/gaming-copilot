@@ -82,7 +82,7 @@ export async function localReply(
   config: PcConfig,
   onText: (text: string) => void,
 ) {
-  const direct = await quickReply(question, config);
+  const direct = await quickReply(question, config, history);
   if (direct !== null) return direct;
   if (!engine) throw Error("Chargez d’abord le modèle gratuit.");
   const context = await assistantContext(config, question);

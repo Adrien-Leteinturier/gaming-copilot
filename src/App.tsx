@@ -1,3 +1,4 @@
+import AssistantText from "./components/AssistantText";
 import { quickReply } from "./agent/quick";
 import { recommendProfile } from "./recommendations";
 import { useEffect, useRef, useState } from "react";
@@ -276,7 +277,7 @@ export default function App({
     setAssistantError("");
     setLiveReply("");
     try {
-      let reply = await quickReply(question, config);
+      let reply = await quickReply(question, config, messages);
       if (reply === null) {
         if (!agent) {
           setPendingQuestion(question);
@@ -701,8 +702,8 @@ export default function App({
                           <div className="suggestions">
                             {[
                               "Analyse ma configuration",
-                              "Que vérifier avant un upgrade ?",
-                              "Aide-moi à régler mon jeu",
+                              "Quel upgrade est pertinent pour ma configuration en 1440p ?",
+                              "Optimise les réglages pour ma configuration",
                             ].map((s) => (
                               <button
                                 key={s}
@@ -725,9 +726,13 @@ export default function App({
                               {m.role === "user" ? "Vous" : "Copilot"}
                             </small>
                             <p>
-                              {m.role === "assistant"
-                                ? cleanModelReply(m.content)
-                                : m.content}
+                              {m.role === "assistant" ? (
+                                <AssistantText
+                                  text={cleanModelReply(m.content)}
+                                />
+                              ) : (
+                                m.content
+                              )}
                             </p>
                           </div>
                         ))
@@ -836,12 +841,12 @@ export default function App({
                           busy || !prompt.trim() || modelState === "loading"
                         }
                         aria-label={
-                          pendingQuestion && modelState !== "ready"
+                          pendingQuestion && !busy && modelState !== "ready"
                             ? `Charger et répondre (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`
                             : "Envoyer"
                         }
                       >
-                        {pendingQuestion && modelState !== "ready" ? (
+                        {pendingQuestion && !busy && modelState !== "ready" ? (
                           `Charger et répondre (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`
                         ) : (
                           <Send size={18} />
