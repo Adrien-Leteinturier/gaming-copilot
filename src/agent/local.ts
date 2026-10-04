@@ -1,10 +1,11 @@
+import { quickReply } from "./quick";
 import {
   CreateWebWorkerMLCEngine,
   type WebWorkerMLCEngine,
   type InitProgressReport,
 } from "@mlc-ai/web-llm";
 import type { Message, PcConfig } from "../domain";
-import { assistantContext, localMessages, priceQueryFrom, cleanModelReply, groundedDiagnostic } from "./context";
+import { assistantContext, localMessages, cleanModelReply } from "./context";
 export const modelIds = {
   light: "Qwen3-0.6B-q4f16_1-MLC",
   balanced: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
@@ -66,32 +67,18 @@ export async function localReply(
   config: PcConfig,
   onText: (text: string) => void,
 ) {
+  const direct = await quickReply(question, config);
+  if (direct !== null) return direct;
   if (!engine) throw Error("Chargez d’abord le modèle gratuit.");
-  if (/prix|co[uû]t|tarif|offres?/i.test(question)) {
-    const query = priceQueryFrom(question, config);
-    if (!query)
-      return "Indiquez une référence précise (par exemple le modèle du processeur ou de la carte graphique), ou ouvrez la page Prix pour comparer les offres.";
-    const { findPrices } = await import("../prices");
-    const result = await findPrices(query);
-    if (!result.offers.length)
-      return `Aucun prix vérifiable pour ${query} dans les pages consultées. Élargissez la recherche dans la page Prix ; ce résultat ne signifie pas que le produit est indisponible.`;
-    const lines = result.offers
-      .slice(0, 4)
-      .map(
-        (o) =>
-          `${o.merchant} : ${o.component} — ${o.amount.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })} hors livraison. Source : ${o.url} (lu le ${new Date(o.observedAt).toLocaleString("fr-FR")}).`,
-      );
-    return `Offres relevées pour ${query} :\n\n${lines.join("\n\n")}\n\nCouverture partielle. Vérifiez la variante, le vendeur et les frais de port ; la page Prix permet d’ouvrir les offres. Ces prix viennent des sources marchandes, pas du modèle.`;
-  }
-  const diagnostic = groundedDiagnostic(question, config);
-  if (diagnostic) return diagnostic;
   const context = await assistantContext(config, question);
   const stream = await engine.chat.completions.create({
     messages: localMessages(question, history, context),
     stream: true,
     max_tokens: 600,
     temperature: 0.7,
-    ...(engine.modelId?.includes(modelIds.light) ? { extra_body: { enable_thinking: false }, presence_penalty: 1.5 } : {}),
+    ...(engine.modelId?.includes(modelIds.light)
+      ? { extra_body: { enable_thinking: false }, presence_penalty: 1.5 }
+      : {}),
   });
   let text = "";
   for await (const chunk of stream) {

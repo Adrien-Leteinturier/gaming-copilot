@@ -1,3 +1,4 @@
+import { quickReply } from "./agent/quick";
 import { recommendProfile } from "./recommendations";
 import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
@@ -83,6 +84,7 @@ export default function App({
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [prompt, setPrompt] = useState("");
+  const [pendingQuestion, setPendingQuestion] = useState("");
   const [component, setComponent] = useState("");
   const [target, setTarget] = useState("");
   const [modelMode, setModelMode] = useState<ModelMode>("light");
@@ -101,6 +103,8 @@ export default function App({
     return import("./agent/local");
   }
   async function initializeModel() {
+    const questionToAnswer = pendingQuestion;
+    const loadingUid = userUid.current;
     modelCancelRequested.current = false;
     setModelState("loading");
     setModelProgress(0);
@@ -117,6 +121,8 @@ export default function App({
       setNotice(
         "Modèle prêt. Les réponses sont calculées sur cet appareil, sans API payante.",
       );
+      if (questionToAnswer && userUid.current === loadingUid)
+        await answerQuestion(questionToAnswer, agent);
     } catch (e) {
       if (e instanceof Error && e.message === "MODEL_LOAD_CANCELLED") {
         setModelState("idle");
@@ -241,21 +247,36 @@ export default function App({
   async function ask(e: React.FormEvent) {
     e.preventDefault();
     if (!prompt.trim() || busy) return;
-    if (modelState !== "ready" || !localAgent.current) {
-      setNotice("Chargez le modèle gratuit pour commencer.");
-      return;
-    }
-    const question = prompt.trim();
+    await answerQuestion(
+      prompt.trim(),
+      modelState === "ready" ? localAgent.current : null,
+    );
+  }
+  async function answerQuestion(
+    question: string,
+    agent: typeof localAgent.current,
+  ) {
     const askingUid = user?.uid ?? null;
     setBusy(true);
     setLiveReply("");
     try {
-      const reply = await localAgent.current.localReply(
-        question,
-        messages,
-        config,
-        setLiveReply,
-      );
+      let reply = await quickReply(question, config);
+      if (reply === null) {
+        if (!agent) {
+          setPendingQuestion(question);
+          setNotice(
+            "Cette question nécessite le modèle local. Cliquez sur « Charger et répondre » ; votre question est conservée. Les analyses de configuration et les prix fonctionnent sans téléchargement.",
+          );
+          return;
+        }
+        reply = await agent.localReply(
+          question,
+          messages,
+          config,
+          setLiveReply,
+        );
+      }
+      setPendingQuestion("");
       if (userUid.current !== askingUid) return;
       const next: Message[] = [
         ...messages,
@@ -556,9 +577,11 @@ export default function App({
                       <div>
                         <strong>Un assistant qui tourne chez vous.</strong>
                         <p>
-                          Aucune clé API, aucun coût par question. Le modèle se
-                          télécharge uniquement après votre clic et reste en
-                          cache si le navigateur le permet.
+                          Analyse de configuration et prix disponibles
+                          immédiatement. Pour les autres questions : aucune clé
+                          API, aucun coût par question. Le modèle se télécharge
+                          uniquement après votre clic et reste en cache si le
+                          navigateur le permet.
                         </p>
                       </div>
                       <label>
@@ -597,9 +620,10 @@ export default function App({
                           </div>
                           <button
                             className="secondary"
-                            onClick={() =>
-                              localAgent.current?.cancelLocalModelLoad()
-                            }
+                            onClick={() => {
+                              modelCancelRequested.current = true;
+                              localAgent.current?.cancelLocalModelLoad();
+                            }}
                           >
                             Arrêter le chargement
                           </button>
@@ -621,11 +645,14 @@ export default function App({
                       ) : (
                         <button
                           className="primary"
+                          disabled={busy}
                           onClick={() => void initializeModel()}
                         >
-                          {modelState === "error"
-                            ? "Réessayer"
-                            : `Charger le modèle gratuit (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`}
+                          {pendingQuestion
+                            ? `Charger et répondre (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`
+                            : modelState === "error"
+                              ? "Réessayer le chargement"
+                              : `Charger le modèle gratuit (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`}
                         </button>
                       )}
                       <small>
@@ -694,12 +721,15 @@ export default function App({
                         maxLength={2000}
                         placeholder="Demandez quelque chose à votre copilote…"
                         value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
+                        onChange={(e) => {
+                          setPrompt(e.target.value);
+                          setPendingQuestion("");
+                        }}
                       />
                       <button
                         className="primary"
                         disabled={
-                          busy || !prompt.trim() || modelState !== "ready"
+                          busy || !prompt.trim() || modelState === "loading"
                         }
                         aria-label="Envoyer"
                       >
