@@ -51,9 +51,7 @@ export async function detectBrowserHardware(): Promise<HardwareReport> {
   try {
     const nav = navigator as Navigator & {
       gpu?: {
-        requestAdapter(options: {
-          powerPreference: string;
-        }): Promise<{
+        requestAdapter(options: { powerPreference: string }): Promise<{
           info?: { description?: string };
           isFallbackAdapter?: boolean;
         } | null>;
@@ -88,4 +86,20 @@ export async function detectBrowserHardware(): Promise<HardwareReport> {
       "Le GPU est celui utilisé par le navigateur ; un PC peut en avoir plusieurs. CPU, RAM physique, disques et alimentation nécessitent le collecteur Windows ou une saisie manuelle.",
     ],
   });
+}
+
+export function decodeCollectorReturn(fragment: string): HardwareReport | null {
+  if (!fragment.startsWith("#hardware=")) return null;
+  const value = fragment.slice(10);
+  if (value.length > 24000 || !/^[A-Za-z0-9_-]+$/.test(value))
+    throw Error("Retour du collecteur invalide.");
+  const bytes = Uint8Array.from(
+    atob(value.replace(/-/g, "+").replace(/_/g, "/")),
+    (c) => c.charCodeAt(0),
+  );
+  const report = hardwareReportSchema.parse(
+    JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)),
+  );
+  if (report.platform !== "windows") throw Error("Rapport Windows attendu.");
+  return report;
 }

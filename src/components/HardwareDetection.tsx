@@ -108,6 +108,26 @@ export default function HardwareDetection({
         </div>
         <span className="platform-tag">{local ? "WINDOWS" : "NAVIGATEUR"}</span>
       </div>
+      {!local && (
+        <div className="scan-bottom">
+          <div>
+            <h3>Inventaire complet depuis Windows</h3>
+            <p>
+              Ouvrez le petit lanceur téléchargé : il identifie CPU, GPU,
+              mémoire, carte mère et disques, puis revient ici automatiquement.
+              Sans installation et sans import de fichier.
+            </p>
+            <p>
+              Windows peut demander une confirmation. Aucun lancement
+              silencieux, aucun droit administrateur et aucune protection
+              modifiée.
+            </p>
+          </div>
+          <a className="primary" href="/gaming-copilot-detect.cmd" download>
+            Télécharger et lancer la détection Windows
+          </a>
+        </div>
+      )}
       <div className="detection-controls">
         {
           <button className="primary" disabled={busy} onClick={detect}>
@@ -122,7 +142,9 @@ export default function HardwareDetection({
               ? "Lecture du matériel…"
               : report
                 ? "Relancer la détection"
-                : "Détecter ce PC"}
+                : local
+                  ? "Détecter ce PC"
+                  : "Détection rapide du navigateur"}
           </button>
         }
         <details className="collector-help">
@@ -149,8 +171,7 @@ export default function HardwareDetection({
           />
         </details>
       </div>
-      <details>
-        <summary>Compléter avec un rapport Windows</summary>
+      <div>
         <p className="detection-privacy">
           Lecture seule. Aucun numéro de série collecté. La détection remplit et
           enregistre votre fiche dans votre espace ; vous pouvez ensuite la
@@ -161,7 +182,7 @@ export default function HardwareDetection({
             {error}
           </p>
         )}
-      </details>
+      </div>
       {report && (
         <div className="scan-result">
           <div className="section-title">

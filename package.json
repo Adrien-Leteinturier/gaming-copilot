@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/generate-seo.mjs && vite --host 127.0.0.1",
-    "build": "node scripts/generate-seo.mjs --production && tsc --noEmit && vite build",
+    "dev": "node scripts/generate-collector.mjs && node scripts/generate-seo.mjs && vite --host 127.0.0.1",
+    "build": "node scripts/generate-collector.mjs && node scripts/generate-seo.mjs --production && tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "tsx --test tests/*.test.ts",
     "dev:full": "vercel dev",

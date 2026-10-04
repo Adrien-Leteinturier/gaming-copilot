@@ -41,7 +41,11 @@ import type { ModelMode } from "./agent/local";
 import { cleanModelReply } from "./agent/context";
 import Dashboard from "./components/Dashboard";
 import HardwareDetection from "./components/HardwareDetection";
-import { applyHardwareReport, type HardwareReport } from "./hardware";
+import {
+  decodeCollectorReturn,
+  applyHardwareReport,
+  type HardwareReport,
+} from "./hardware";
 type Page = "Dashboard" | "Ma Config" | "Assistant" | "Prix";
 const nav = [
   { name: "Dashboard", icon: LayoutDashboard },
@@ -56,7 +60,11 @@ function readLocal<T>(key: string, fallback: T): T {
     return fallback;
   }
 }
-export default function App() {
+export default function App({
+  collectorFragment = "",
+}: {
+  collectorFragment?: string;
+}) {
   const [page, setPage] = useState<Page>("Dashboard");
   const [user, setUser] = useState<User | null>(null);
   const userUid = useRef<string | null>(null);
@@ -286,6 +294,18 @@ export default function App() {
         : "Matériel enregistré. Profil de départ calculé automatiquement.",
     );
   };
+  const collectorReceived = useRef(false);
+  useEffect(() => {
+    if (!ready || !collectorFragment || collectorReceived.current) return;
+    collectorReceived.current = true;
+    setPage("Ma Config");
+    try {
+      const reportValue = decodeCollectorReturn(collectorFragment);
+      if (reportValue) void applyDetected(reportValue).catch(report);
+    } catch (error) {
+      report(error);
+    }
+  }, [ready, collectorFragment]);
   const filled = Object.keys(fields).filter((k) =>
     config[k as keyof typeof fields].trim(),
   ).length;
