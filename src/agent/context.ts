@@ -69,3 +69,7 @@ export function groundedDiagnostic(question: string, config: PcConfig): string |
   if (/upgrade|avant.*achat|am[eé]lior.*pc/i.test(question)) return "Pour préparer un upgrade utile :\n1. Précisez les jeux, votre résolution et votre budget.\n2. Mesurez une scène reproductible : fluidité, frametimes et utilisation CPU/GPU.\n3. Déterminez le composant qui limite votre usage avant de le remplacer.\n4. Vérifiez la compatibilité constructeur, le BIOS, l’alimentation et les dimensions.\n5. Comparez la référence précise dans la page Prix.\n\nSans mesure ni source vérifiée, je ne peux pas promettre un gain de FPS ou recommander une référence au hasard.";
   return null;
 }
+
+export function cleanModelReply(text: string) {
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/<\/?think>/gi, "").trim();
+}

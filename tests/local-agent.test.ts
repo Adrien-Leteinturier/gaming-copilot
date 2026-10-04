@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assistantContext, localMessages, groundedDiagnostic, priceQueryFrom } from "../src/agent/context";
+import { assistantContext, localMessages, cleanModelReply, groundedDiagnostic, priceQueryFrom } from "../src/agent/context";
 import { emptyConfig } from "../src/domain";
 test("Local agent uses real configuration and exposes missing hardware without inventing measurements", async () => {
   const context = JSON.parse(
@@ -39,4 +39,9 @@ test("Price routing extracts concrete models instead of allowing fabricated quot
   assert.equal(priceQueryFrom("Quel est le prix d’une RX 9060 XT ?", emptyConfig), "RX 9060 XT");
   assert.equal(priceQueryFrom("Combien coûte mon CPU ?", { ...emptyConfig, cpu: "AMD Ryzen 7 5700X 8-Core Processor" }), "5700X");
   assert.equal(priceQueryFrom("Quel est le prix ?", emptyConfig), null);
+});
+
+test("The assistant never renders internal model thinking tags", () => {
+  assert.equal(cleanModelReply("<think>internal notes</think>\nRéponse visible"), "Réponse visible");
+  assert.equal(cleanModelReply("<think>\n</think>\nRéponse"), "Réponse");
 });

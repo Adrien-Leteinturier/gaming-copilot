@@ -4,7 +4,7 @@ import {
   type InitProgressReport,
 } from "@mlc-ai/web-llm";
 import type { Message, PcConfig } from "../domain";
-import { assistantContext, localMessages, priceQueryFrom, groundedDiagnostic } from "./context";
+import { assistantContext, localMessages, priceQueryFrom, cleanModelReply, groundedDiagnostic } from "./context";
 export const modelIds = {
   light: "Qwen3-0.6B-q4f16_1-MLC",
   balanced: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
@@ -97,6 +97,7 @@ export async function localReply(
   for await (const chunk of stream) {
     text += chunk.choices[0]?.delta.content ?? "";
   }
+  text = cleanModelReply(text);
   if (!text.trim())
     throw Error("Aucune réponse générée. Essayez une question plus courte.");
   if (/\b\d+(?:[.,]\d+)?\s*(?:fps|images par seconde|€|euros?|%)/i.test(text)) {

@@ -37,6 +37,7 @@ import {
 } from "./domain";
 import PriceSearch from "./components/PriceSearch";
 import type { ModelMode } from "./agent/local";
+import { cleanModelReply } from "./agent/context";
 import Dashboard from "./components/Dashboard";
 import HardwareDetection from "./components/HardwareDetection";
 import { applyHardwareReport, type HardwareReport } from "./hardware";
@@ -585,7 +586,7 @@ export default function App() {
                         </button>
                       )}
                       <small>
-                        Modèles Qwen · licence ouverte · licence Apache 2.0.{" "}
+                        Modèles Qwen · licence Apache 2.0.{" "}
                         <a
                           href="https://huggingface.co/Qwen/Qwen3-0.6B"
                           target="_blank"
@@ -623,7 +624,7 @@ export default function App() {
                             <small>
                               {m.role === "user" ? "Vous" : "Copilot"}
                             </small>
-                            <p>{m.content}</p>
+                            <p>{m.role === "assistant" ? cleanModelReply(m.content) : m.content}</p>
                           </div>
                         ))
                       )}

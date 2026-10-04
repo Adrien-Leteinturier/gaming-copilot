@@ -25,11 +25,13 @@ export default function PriceSearch({
     guessCategory(initialQuery),
   );
   const [result, setResult] = useState<PriceResult | null>(null);
+  const activeTarget = result?.query === initialQuery ? target : undefined;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const request = useRef<AbortController | null>(null);
   useEffect(() => {
     if (initialQuery) {
+      request.current?.abort(); setBusy(false);
       setQuery(initialQuery);
       setCategory(guessCategory(initialQuery));
       setResult(null);
@@ -139,9 +141,9 @@ export default function PriceSearch({
             partie des catalogues, pas tout le marché. LDLC et Materiel.net
             appartiennent au même groupe.
           </p>
-          {target && (
+          {activeTarget && (
             <p>
-              Votre objectif : {euros(target)}. Les frais de port restent à
+              Votre objectif : {euros(activeTarget!)}. Les frais de port restent à
               ajouter.
             </p>
           )}
@@ -188,7 +190,7 @@ export default function PriceSearch({
                   {i === 0 && (
                     <small>Le plus bas parmi les offres affichées</small>
                   )}
-                  {target && o.amount <= target && (
+                  {activeTarget && o.amount <= activeTarget! && (
                     <span className="pill">Sous votre seuil hors port</span>
                   )}
                   <a
