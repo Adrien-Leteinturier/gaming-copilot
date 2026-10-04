@@ -173,34 +173,61 @@ export default function Dashboard({
         <div className="overview-right">
           <section className="objective-panel">
             <div className="section-title">
-              <h3>Votre profil conseillé.</h3>
+              <h3>Votre meilleur équilibre en jeu.</h3>
               <Monitor size={20} />
             </div>
             <div className="objective-values">
               <span>
-                {profile.resolution}
-                <small>Résolution de départ</small>
+                {profile.ready ? profile.resolution : "À identifier"}
+                <small>Résolution conseillée</small>
               </span>
               <span>
-                {profile.fps}
-                <small>FPS à viser, non mesurés</small>
+                {profile.ready ? profile.fps : "—"}
+                <small>Objectif à tester, non mesuré</small>
               </span>
             </div>
             <div className="objective-bottom">
               <div>
-                <p>Qualité : {profile.quality} · Ray tracing désactivé</p>
-                <p>{profile.reason}</p>
                 <p>
-                  Si l’écran est limité à une résolution inférieure, utilisez
-                  celle-ci. Confirmez la fluidité en jeu.
+                  Qualité conseillée : {profile.quality} · Ray tracing désactivé
                 </p>
+                <p>{profile.reason}</p>
+                {profile.ready && (
+                  <details className="profile-details">
+                    <summary>Voir les réglages et priorités</summary>
+                    <h4>Les réglages à privilégier</h4>
+                    <ul className="profile-advice">
+                      {profile.steps.map((step) => (
+                        <li key={step}>{step}</li>
+                      ))}
+                    </ul>
+                    <p>{profile.alternative}</p>
+                    <h4>Avant d’acheter du matériel</h4>
+                    <ul className="profile-advice">
+                      {profile.priorities.map((step) => (
+                        <li key={step}>{step}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                <p className="muted">{profile.validation}</p>
+                {profile.source && (
+                  <a
+                    className="text-link"
+                    href={profile.source}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Repère constructeur pour ce GPU
+                  </a>
+                )}
               </div>
               <button
                 className="text-link"
                 onClick={openConfig}
-                aria-label="Ajuster les objectifs"
+                aria-label="Compléter les informations de ma configuration"
               >
-                <ArrowUpRight size={20} />
+                Compléter ma config <ArrowUpRight size={20} />
               </button>
             </div>
           </section>

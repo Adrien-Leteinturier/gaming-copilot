@@ -1592,3 +1592,13 @@ footer button:hover {
     grid-template-columns: 1fr;
   }
 }
+
+.profile-advice { padding-left: 20px; margin: 10px 0 18px; color: var(--muted); font-size: 13px; line-height: 1.65; }
+.profile-advice li + li { margin-top: 8px; }
+.objective-bottom { flex-wrap: wrap; }
+.objective-bottom h4 { margin: 20px 0 8px; }
+
+.objective-panel .profile-advice { color: #304522; }
+.objective-bottom > div { width: 100%; }
+.objective-bottom p { max-width: none; font-size: 12px; line-height: 1.6; margin-bottom: 12px; }
+.profile-details summary { cursor: pointer; font-weight: 650; margin: 16px 0; font-size: 13px; }

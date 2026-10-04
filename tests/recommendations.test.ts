@@ -41,3 +41,29 @@ test("profiles use conservative defaults for unknown GPU and never target user-e
     "Bas",
   );
 });
+
+test("optimization advice changes with RAM and GPU, without copying saved goals", () => {
+  const rig = {
+    ...emptyConfig,
+    gpu: "AMD RX 9060 XT 8GB",
+    cpu: "Ryzen 7 5700X",
+    ram: "32 GiB",
+    storage: "NVMe SSD",
+    resolution: "4K" as const,
+    targetFps: 500,
+  };
+  const profile = recommendProfile(rig);
+  assert.equal(profile.resolution, "1440p");
+  assert.equal(profile.fps, 60);
+  assert.ok(profile.reason.includes(rig.gpu));
+  assert.ok(profile.priorities.some((p) => p.includes(rig.cpu)));
+  assert.ok(profile.steps.some((p) => p.includes("8 Go")));
+  assert.equal(recommendProfile({ ...rig, ram: "8 Go" }).quality, "Moyen");
+  assert.ok(
+    recommendProfile({ ...rig, ram: "8 Go" }).priorities.some((p) =>
+      p.includes("16 Go"),
+    ),
+  );
+  assert.ok(profile.validation.includes("Aucun FPS"));
+  assert.equal(recommendProfile(emptyConfig).steps.length, 1);
+});
