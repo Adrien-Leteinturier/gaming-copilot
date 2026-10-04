@@ -1,3 +1,4 @@
+import { componentAdvice } from "./component-advice";
 import { adviceQuestion, buildSetupAdvice } from "./advice";
 import type { Message, PcConfig } from "../domain";
 import { priceQueryFrom, groundedDiagnostic } from "./context";
@@ -8,6 +9,8 @@ export async function quickReply(
 ): Promise<string | null> {
   const adviceIntent = adviceQuestion(question, history);
   if (adviceIntent) {
+    const specific = componentAdvice(adviceIntent, config);
+    if (specific) return specific;
     const advice = buildSetupAdvice(adviceIntent, config);
     if (!advice.budget || !advice.candidates.length) return advice.text;
     const { findPrices } = await import("../prices");

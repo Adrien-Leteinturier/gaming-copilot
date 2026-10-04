@@ -66,3 +66,36 @@ test("visitor's exact ideal setup question routes to hardware-grounded advice", 
   assert.match(reply!, /RX 9060 XT/);
   assert.match(reply!, /alimentation n’est pas renseignée/);
 });
+
+test("SSD recommendation stays on storage and retains capacity/budget follow-ups", async () => {
+  const question = "Conseille moi un modele de SSD";
+  const answer = (await quickReply(question, rig))!;
+  assert.match(answer, /Samsung 990 EVO Plus/);
+  assert.match(answer, /M.2 2280/);
+  assert.match(answer, /NVMe SSD/);
+  assert.match(answer, /emplacement est libre/);
+  assert.doesNotMatch(
+    answer,
+    /RX 9070|RTX 5070|alimentation n’est pas|réglages de départ/i,
+  );
+  const followup = (await quickReply("1 To et 100 euros maximum", rig, [
+    { role: "user", content: question },
+    { role: "assistant", content: answer },
+  ]))!;
+  assert.match(followup, /en 1 To/);
+  assert.match(followup, /plafond est de 100/);
+  assert.match(followup, /sans offre vérifiée/);
+  const unknown = (await quickReply(question, emptyConfig))!;
+  assert.match(unknown, /carte mère inconnue/);
+});
+
+test("component recommendations do not default to a GPU upgrade", async () => {
+  for (const question of [
+    "Conseille moi de la RAM",
+    "Recommande un processeur",
+  ]) {
+    const answer = (await quickReply(question, rig))!;
+    assert.doesNotMatch(answer, /RX 9070|RTX 5070|FPS.*garanti/);
+    assert.match(answer, /budget/i);
+  }
+});
