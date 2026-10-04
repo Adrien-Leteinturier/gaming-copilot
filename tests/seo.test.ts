@@ -1,19 +1,24 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-// @ts-expect-error SEO build code is deliberately plain JavaScript, runnable before compilation.
-import { buildSeo, publicOrigin, pages, resolveSiteUrl } from "../scripts/seo.mjs";
+import {
+  buildSeo,
+  publicOrigin,
+  pages,
+  resolveSiteUrl,
+} from "../scripts/seo.mjs";
 test("Production sitemap only includes canonical public pages", () => {
   const files = buildSeo({
     siteUrl: "https://gaming-copilot.fr/",
     environment: "production",
   });
-  const sitemap = files.get("sitemap.xml");
+  const sitemap = files.get("sitemap.xml")!;
   assert.equal((sitemap.match(/<loc>/g) || []).length, 2);
   assert.ok(!sitemap.includes("/api/"));
   assert.ok(!sitemap.includes("localhost"));
   assert.ok(!sitemap.includes("lastmod"));
   for (const page of pages) {
     const html = files.get(page.path.slice(1) + "/index.html");
+    assert.ok(html, "Every public page must have HTML");
     assert.ok(
       html.includes(
         `<link rel="canonical" href="https://gaming-copilot.fr${page.path}">`,
@@ -33,9 +38,9 @@ test("Preview builds are never indexable and never advertise a sitemap", () => {
   ]) {
     const files = buildSeo(input);
     assert.ok(!files.has("sitemap.xml"));
-    assert.ok(files.get("robots.txt").includes("Disallow: /"));
-    assert.ok(!files.get("robots.txt").includes("Sitemap:"));
-    assert.ok(files.get("decouvrir/index.html").includes("noindex,follow"));
+    assert.ok(files.get("robots.txt")!.includes("Disallow: /"));
+    assert.ok(!files.get("robots.txt")!.includes("Sitemap:"));
+    assert.ok(files.get("decouvrir/index.html")!.includes("noindex,follow"));
   }
 });
 test("Invalid canonical origins fail the build instead of creating wrong SEO URLs", () => {
@@ -67,7 +72,7 @@ test("Stable production Vercel domain is used, never a deployment or branch URL"
   assert.equal(resolveSiteUrl({ VERCEL_URL: env.VERCEL_URL }), "");
   assert.ok(
     buildSeo({ siteUrl: resolveSiteUrl(env), environment: "production" })
-      .get("sitemap.xml")
+      .get("sitemap.xml")!
       .includes("https://gaming-copilot.vercel.app/decouvrir"),
   );
   assert.ok(
@@ -76,4 +81,3 @@ test("Stable production Vercel domain is used, never a deployment or branch URL"
     ),
   );
 });
-

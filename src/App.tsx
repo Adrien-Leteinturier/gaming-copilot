@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import {
   Gamepad2,
@@ -35,6 +35,8 @@ import {
   type Alert,
   type Message,
 } from "./domain";
+import PriceSearch from "./components/PriceSearch";
+import type { ModelMode } from "./agent/local";
 import Dashboard from "./components/Dashboard";
 import HardwareDetection from "./components/HardwareDetection";
 import { applyHardwareReport, type HardwareReport } from "./hardware";
@@ -55,6 +57,7 @@ function readLocal<T>(key: string, fallback: T): T {
 export default function App() {
   const [page, setPage] = useState<Page>("Dashboard");
   const [user, setUser] = useState<User | null>(null);
+  const userUid = useRef<string | null>(null);
   const [ready, setReady] = useState(!auth);
   const [config, setConfig] = useState<PcConfig>(() =>
     readLocal("gc.config", emptyConfig),
@@ -72,12 +75,70 @@ export default function App() {
   const [prompt, setPrompt] = useState("");
   const [component, setComponent] = useState("");
   const [target, setTarget] = useState("");
+  const [modelMode, setModelMode] = useState<ModelMode>("light");
+  const [modelState, setModelState] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
+  const [modelProgress, setModelProgress] = useState(0);
+  const [liveReply, setLiveReply] = useState("");
+  const [priceQuery, setPriceQuery] = useState("");
+  const [priceTarget, setPriceTarget] = useState<number | undefined>();
+  const modelCancelRequested = useRef(false);
+  const localAgent = useRef<Awaited<
+    ReturnType<typeof importLocalAgent>
+  > | null>(null);
+  function importLocalAgent() {
+    return import("./agent/local");
+  }
+  async function initializeModel() {
+    modelCancelRequested.current = false;
+    setModelState("loading");
+    setModelProgress(0);
+    try {
+      const agent = await importLocalAgent();
+      localAgent.current = agent;
+      if (modelCancelRequested.current) throw Error("MODEL_LOAD_CANCELLED");
+      await agent.loadLocalModel(modelMode, (p) =>
+        setModelProgress(
+          Math.round(Math.max(0, Math.min(1, p.progress)) * 100),
+        ),
+      );
+      setModelState("ready");
+      setNotice(
+        "Modèle prêt. Les réponses sont calculées sur cet appareil, sans API payante.",
+      );
+    } catch (e) {
+      if (e instanceof Error && e.message === "MODEL_LOAD_CANCELLED") {
+        setModelState("idle");
+        setNotice(
+          "Chargement arrêté. Les fichiers déjà téléchargés peuvent rester en cache.",
+        );
+      } else {
+        setModelState("error");
+        report(e);
+      }
+    }
+  }
+  async function releaseModel() {
+    await localAgent.current?.unloadLocalModel();
+    setModelState("idle");
+    setModelProgress(0);
+  }
+  useEffect(
+    () => () => {
+      localAgent.current?.cancelLocalModelLoad();
+      void localAgent.current?.unloadLocalModel();
+    },
+    [],
+  );
   const report = (e: unknown) =>
     setNotice(e instanceof Error ? e.message : "Une erreur est survenue.");
   useEffect(() => {
     if (!auth) return;
     return onAuthStateChanged(auth, async (u) => {
       setReady(false);
+      userUid.current = u?.uid ?? null;
+      localAgent.current?.stopLocalReply();
       setUser(u);
       try {
         if (u) {
@@ -145,7 +206,9 @@ export default function App() {
       setAlerts([...alerts, alert]);
       setComponent("");
       setTarget("");
-      setNotice("Seuil enregistré. La surveillance attend une source de prix.");
+      setNotice(
+        "Seuil enregistré. Utilisez « Comparer ce seuil » pour vérifier les offres actuelles.",
+      );
     } catch (e) {
       report(e);
     } finally {
@@ -168,38 +231,37 @@ export default function App() {
   async function ask(e: React.FormEvent) {
     e.preventDefault();
     if (!prompt.trim() || busy) return;
+    if (modelState !== "ready" || !localAgent.current) {
+      setNotice("Chargez le modèle gratuit pour commencer.");
+      return;
+    }
     const question = prompt.trim();
+    const askingUid = user?.uid ?? null;
     setBusy(true);
+    setLiveReply("");
     try {
-      if (!user) {
-        setNotice(
-          "Connectez Firebase puis votre compte pour utiliser l’assistant IA.",
-        );
-        return;
-      }
-      const token = await user.getIdToken();
-      const response = await fetch("/api/assistant", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ message: question }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw Error(data.error ?? "Assistant indisponible");
+      const reply = await localAgent.current.localReply(
+        question,
+        messages,
+        config,
+        setLiveReply,
+      );
+      if (userUid.current !== askingUid) return;
       const next: Message[] = [
         ...messages,
-        { role: "user", content: question },
-        { role: "assistant", content: data.reply },
-      ];
-      await saveMessages(user.uid, next);
+        { role: "user" as const, content: question },
+        { role: "assistant" as const, content: reply },
+      ].slice(-50);
       setMessages(next);
       setPrompt("");
+      setLiveReply("");
+      if (user) await saveMessages(user.uid, next);
+      else localStorage.setItem("gc.messages", JSON.stringify(next));
     } catch (e) {
       report(e);
     } finally {
       setBusy(false);
+      setLiveReply("");
     }
   }
   const applyDetected = (report: HardwareReport) => {
@@ -443,12 +505,98 @@ export default function App() {
                       </span>
                       <div>
                         <strong>Gaming Copilot</strong>
-                        <small>
-                          {user
-                            ? "Votre configuration enregistrée sert de contexte"
-                            : "Connexion requise pour l’IA"}
-                        </small>
+                        <small>Gratuit · calculé sur votre appareil</small>
                       </div>
+                    </div>
+                    <div className="local-model-panel">
+                      <div>
+                        <strong>Un assistant qui tourne chez vous.</strong>
+                        <p>
+                          Aucune clé API, aucun coût par question. Le modèle se
+                          télécharge uniquement après votre clic et reste en
+                          cache si le navigateur le permet.
+                        </p>
+                      </div>
+                      <label>
+                        Mode
+                        <select
+                          value={modelMode}
+                          disabled={
+                            modelState === "loading" ||
+                            modelState === "ready" ||
+                            busy
+                          }
+                          onChange={(e) =>
+                            setModelMode(e.target.value as ModelMode)
+                          }
+                        >
+                          <option value="light">
+                            Léger · environ 400 Mo · réponses simples
+                          </option>
+                          <option value="balanced">
+                            Plus précis · environ 900 Mo
+                          </option>
+                        </select>
+                      </label>
+                      <small>
+                        Prévoir environ{" "}
+                        {modelMode === "light" ? "1,5 Go" : "2 Go"} de mémoire
+                        graphique libre. Chrome ou Edge compatible WebGPU
+                        recommandé. Le calcul mobilise votre GPU : évitez de le
+                        lancer en pleine partie.
+                      </small>
+                      {modelState === "loading" ? (
+                        <>
+                          <div className="model-progress" role="status">
+                            <progress value={modelProgress} max={100} />{" "}
+                            Chargement : {modelProgress} %
+                          </div>
+                          <button
+                            className="secondary"
+                            onClick={() =>
+                              localAgent.current?.cancelLocalModelLoad()
+                            }
+                          >
+                            Arrêter le chargement
+                          </button>
+                        </>
+                      ) : modelState === "ready" ? (
+                        <div className="model-ready">
+                          <span className="pill">
+                            Prêt ·{" "}
+                            {modelMode === "light" ? "Qwen3 0.6B" : "Qwen 1.5B"}
+                          </span>
+                          <button
+                            className="text-button"
+                            disabled={busy}
+                            onClick={() => void releaseModel()}
+                          >
+                            Libérer la mémoire
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          className="primary"
+                          onClick={() => void initializeModel()}
+                        >
+                          {modelState === "error"
+                            ? "Réessayer"
+                            : `Charger le modèle gratuit (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`}
+                        </button>
+                      )}
+                      <small>
+                        Modèles Qwen · licence ouverte · licence Apache 2.0.{" "}
+                        <a
+                          href="https://huggingface.co/Qwen/Qwen3-0.6B"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Voir le modèle
+                        </a>
+                        . Sans connexion, les échanges restent sur cet appareil
+                        ; connecté, l’historique est synchronisé dans votre
+                        compte.
+                      </small>
                     </div>
                     <div className="messages" aria-live="polite">
                       {!messages.length ? (
@@ -480,6 +628,18 @@ export default function App() {
                         ))
                       )}
                     </div>
+                    {busy && (
+                      <div className="message assistant" role="status">
+                        <small>Copilot · en cours</small>
+                        <p>{liveReply || "Préparation de la réponse…"}</p>
+                        <button
+                          className="text-button"
+                          onClick={() => localAgent.current?.stopLocalReply()}
+                        >
+                          Arrêter la réponse
+                        </button>
+                      </div>
+                    )}
                     <form className="composer" onSubmit={ask}>
                       <input
                         aria-label="Votre question"
@@ -490,15 +650,18 @@ export default function App() {
                       />
                       <button
                         className="primary"
-                        disabled={busy || !prompt.trim()}
+                        disabled={
+                          busy || !prompt.trim() || modelState !== "ready"
+                        }
                         aria-label="Envoyer"
                       >
                         <Send size={18} />
                       </button>
                     </form>
                     <small className="chat-note">
-                      Les conseils de l’IA doivent être confrontés aux fiches
-                      constructeur.
+                      Le mode léger répond à des questions simples et peut se
+                      tromper. Vérifiez les conseils sur les fiches
+                      constructeur. Aucun FPS mesuré n’est déduit du matériel.
                     </small>
                   </section>
                   <div className="panel tips">
@@ -523,19 +686,27 @@ export default function App() {
               )}
               {page === "Prix" && (
                 <>
+                  <PriceSearch
+                    initialQuery={priceQuery}
+                    target={priceTarget}
+                    onSelect={(query) => {
+                      setComponent(query.slice(0, 150));
+                      setNotice(
+                        "Référence ajoutée au formulaire. Choisissez votre seuil et enregistrez-le.",
+                      );
+                    }}
+                  />
                   <div className="provider-banner">
                     <ShieldCheck />
                     <div>
-                      <strong>
-                        Le suivi des prix n’est pas encore connecté.
-                      </strong>
+                      <strong>Vérifiez vos prix à la demande.</strong>
                       <p>
-                        Aucune source marchande connectée. Les seuils sont
-                        enregistrés ; la surveillance et les notifications sont
-                        en attente.
+                        Les seuils servent à comparer vos objectifs aux offres
+                        lors d’une recherche. Aucune surveillance en
+                        arrière-plan ni notification automatique n’est activée.
                       </p>
                     </div>
-                    <span className="pill">À connecter</span>
+                    <span className="pill">Recherche active</span>
                   </div>
                   <div className="config-layout">
                     <form className="panel config-form" onSubmit={addAlert}>
@@ -585,7 +756,16 @@ export default function App() {
                               <small>
                                 Objectif : {a.target.toLocaleString("fr-FR")} €
                               </small>
-                              <small>Source en attente</small>
+                              <small>Vérification à la demande</small>
+                              <button
+                                className="text-button"
+                                onClick={() => {
+                                  setPriceQuery(a.component);
+                                  setPriceTarget(a.target);
+                                }}
+                              >
+                                Comparer ce seuil
+                              </button>
                             </div>
                             <button
                               aria-label={`Supprimer ${a.component}`}

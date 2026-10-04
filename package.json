@@ -13,12 +13,14 @@
     "seo:generate": "node scripts/generate-seo.mjs --production"
   },
   "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.85",
+    "cheerio": "^1.2.0",
     "firebase": "^12.0.0",
     "firebase-admin": "^13.0.0",
     "lucide-react": "^0.468.0",
-    "openai": "^6.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "robots-parser": "^3.0.1",
     "zod": "^4.0.0"
   },
   "devDependencies": {

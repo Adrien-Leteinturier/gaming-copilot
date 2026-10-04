@@ -214,7 +214,7 @@ export default function Dashboard({
                     ? alertsCount + " seuil(s) enregistré(s)"
                     : "Votre prochain achat"}
                 </strong>
-                <small>Sources de prix à connecter</small>
+                <small>Comparer les offres marchandes</small>
               </div>
               <ArrowUpRight size={18} />
             </button>

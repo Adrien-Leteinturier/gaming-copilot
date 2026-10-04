@@ -3,7 +3,7 @@
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
   "functions": {
-    "api/assistant.ts": {
+    "api/prices.ts": {
       "maxDuration": 60
     }
   },
@@ -90,5 +90,7 @@
     }
   ],
   "trailingSlash": false,
-  "regions": ["cdg1"]
+  "regions": [
+    "cdg1"
+  ]
 }
