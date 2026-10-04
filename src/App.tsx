@@ -242,6 +242,7 @@ export default function App() {
           {nav.map(({ name, icon: Icon }) => (
             <button
               key={name}
+              aria-current={page === name ? "page" : undefined}
               className={page === name ? "selected" : ""}
               onClick={() => setPage(name)}
             >
@@ -253,11 +254,8 @@ export default function App() {
         </nav>
         <div className="side-card">
           <Cpu size={22} />
-          <strong>Le matériel d’abord.</strong>
-          <p>
-            Un inventaire pour savoir ce que vous avez, avant de décider quoi
-            changer.
-          </p>
+          <strong>Le prochain move ?</strong>
+          <p>Une question sur votre PC ? Commencez avec votre configuration.</p>
           <button onClick={() => setPage("Assistant")}>
             Ouvrir l’assistant <ArrowUpRight size={16} />
           </button>
@@ -287,10 +285,10 @@ export default function App() {
         </header>
         <main>
           <div className="page-heading">
-            <div className="eyebrow">GAMING COPILOT / ATELIER PC</div>
+            <div className="eyebrow">VOTRE PC, VOS RÈGLES</div>
             <h1>
               {page === "Dashboard"
-                ? "Le point sur votre PC."
+                ? "Votre setup. À vous de jouer."
                 : page === "Ma Config"
                   ? "Identifier votre matériel."
                   : page === "Assistant"
@@ -299,7 +297,7 @@ export default function App() {
             </h1>
             <p>
               {page === "Dashboard"
-                ? "Votre inventaire, vos objectifs et les prochaines choses à vérifier."
+                ? "Tout votre matériel au même endroit. La suite, c’est vous qui décidez."
                 : page === "Ma Config"
                   ? "Détection Windows, import de rapport ou saisie manuelle : choisissez ce qui vous convient."
                   : page === "Assistant"

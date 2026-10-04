@@ -1,7 +1,7 @@
 :root {
   font-family: "Segoe UI", system-ui, sans-serif;
-  color: #e4e5e1;
-  background: #131515;
+  color: #f2f3fa;
+  background: #101219;
   color-scheme: dark;
 }
 * {
@@ -11,14 +11,14 @@ body {
   margin: 0;
 }
 a {
-  color: #efb47f;
+  color: #b1c2ff;
   text-underline-offset: 4px;
 }
 a:hover {
-  color: #ffcfaa;
+  color: #c9f48a;
 }
 a:focus-visible {
-  outline: 2px solid #efb47f;
+  outline: 2px solid #b1c2ff;
   outline-offset: 5px;
 }
 header,
@@ -32,17 +32,17 @@ footer {
   gap: 24px;
 }
 header {
-  border-bottom: 1px solid #384030;
+  border-bottom: 1px solid #303440;
 }
 .brand {
   font-size: 21px;
   font-weight: 650;
-  color: #e4e5e1;
+  color: #f2f3fa;
   text-decoration: none;
   letter-spacing: -0.7px;
 }
 .brand span {
-  color: #efac72;
+  color: #c9f48a;
 }
 nav {
   display: flex;
@@ -56,14 +56,14 @@ main {
   padding: 68px 30px 54px;
 }
 .eyebrow {
-  font-family: Consolas, monospace;
+  font-family: "Segoe UI", sans-serif;
   letter-spacing: 1.8px;
   font-size: 10px;
-  color: #b7a386;
+  color: #aab8ff;
 }
 h1 {
   font-size: clamp(29px, 4vw, 43px);
-  font-weight: 550;
+  font-weight: 750;
   line-height: 1.18;
   letter-spacing: -1.3px;
   margin: 18px 0 24px;
@@ -72,14 +72,14 @@ h1 {
 h2 {
   font-size: 23px;
   letter-spacing: -0.5px;
-  font-weight: 500;
+  font-weight: 650;
   margin: 0 0 15px;
 }
 p,
 li {
   font-size: 15px;
   line-height: 1.85;
-  color: #b5bcae;
+  color: #aeb7ce;
 }
 p {
   margin: 12px 0;
@@ -87,17 +87,17 @@ p {
 .lead {
   font-size: 18px;
   line-height: 1.7;
-  color: #c5ccbd;
+  color: #d0d8ee;
 }
 .steps {
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
-  border: 1px solid #46503b;
-  background: #20261b;
+  border: 1px solid #455b96;
+  background: #202b50;
   padding: 20px;
   margin: 30px 0 42px;
-  color: #bbc9a6;
+  color: #c4d2fb;
   font:
     11px Consolas,
     monospace;
@@ -105,7 +105,7 @@ p {
 }
 section {
   padding: 32px 0;
-  border-top: 1px solid #384030;
+  border-top: 1px solid #303440;
 }
 section > a {
   font-size: 14px;
@@ -113,18 +113,18 @@ section > a {
   margin-top: 12px;
 }
 code {
-  background: #252d1e;
-  border: 1px solid #46533a;
+  background: #202638;
+  border: 1px solid #45506b;
   padding: 8px 11px;
   display: block;
   margin: 13px 0;
   overflow-wrap: anywhere;
   font-size: 12px;
-  color: #d8decf;
+  color: #e0e7fa;
 }
 .cta {
   margin-top: 30px;
-  border-top: 1px solid #47503b;
+  border-top: 1px solid #303440;
   padding-top: 28px;
   display: flex;
   flex-wrap: wrap;
@@ -133,25 +133,25 @@ code {
 }
 .button {
   display: inline-block;
-  background: #efac72;
-  color: #24201c;
+  background: #c9f48a;
+  color: #202b19;
   text-decoration: none;
   font-weight: 600;
   padding: 14px 20px;
-  border-radius: 4px;
+  border-radius: 9px;
   font-size: 14px;
 }
 .button:hover {
-  background: #ffc797;
-  color: #24201c;
+  background: #dcffaf;
+  color: #202b19;
 }
 .cta > span {
-  color: #99a48c;
+  color: #a2afca;
   font-size: 12px;
 }
 footer {
-  border-top: 1px solid #384030;
-  color: #829174;
+  border-top: 1px solid #303440;
+  color: #9aa6c1;
   flex-wrap: wrap;
   font:
     10px Consolas,
@@ -166,8 +166,8 @@ footer a {
   position: absolute;
   left: 20px;
   top: -80px;
-  background: #efac72;
-  color: #24201c;
+  background: #c9f48a;
+  color: #202b19;
   padding: 13px;
 }
 .skip:focus {
@@ -197,4 +197,10 @@ footer a {
   footer {
     padding: 23px 22px;
   }
+}
+
+.steps {
+  border-radius: 12px;
+  font-family: inherit;
+  font-weight: 600;
 }
