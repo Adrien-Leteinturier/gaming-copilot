@@ -1,1 +1,93 @@
-{"framework":"vite","buildCommand":"npm run build","outputDirectory":"dist","functions":{"api/assistant.ts":{"maxDuration":60}},"rewrites":[{"source":"/((?!api/).*)","destination":"/index.html"}]}
+{
+  "framework": "vite",
+  "buildCommand": "pnpm build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/assistant.ts": {
+      "maxDuration": 60
+    }
+  },
+  "redirects": [
+    {
+      "source": "/decouvrir/index.html",
+      "destination": "/decouvrir",
+      "permanent": true
+    },
+    {
+      "source": "/guides/identifier-composants-pc/index.html",
+      "destination": "/guides/identifier-composants-pc",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/decouvrir",
+      "destination": "/decouvrir/index.html"
+    },
+    {
+      "source": "/guides/identifier-composants-pc",
+      "destination": "/guides/identifier-composants-pc/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, follow"
+        }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, follow"
+        }
+      ]
+    },
+    {
+      "source": "/api/:path*",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/detect-hardware.ps1",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/sitemap.xml",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/xml; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "/robots.txt",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/plain; charset=utf-8"
+        }
+      ]
+    }
+  ],
+  "trailingSlash": false
+}

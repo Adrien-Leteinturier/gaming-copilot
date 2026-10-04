@@ -606,7 +606,8 @@ export default function App() {
           )}
           <footer>
             <span>GAMING COPILOT</span>
-            <span>INVENTAIRE / CONSEILS / SUIVI</span>
+            <a href="/decouvrir">Découvrir le projet</a>
+            <a href="/guides/identifier-composants-pc">Guide matériel</a>
             <button
               onClick={() =>
                 gotoAssistant(

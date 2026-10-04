@@ -4,3 +4,9 @@ dist/
 .env*
 !.env.example
 gaming-copilot-hardware.json
+
+# Generated public SEO files (recreated at dev/build time)
+public/decouvrir/
+public/guides/
+public/robots.txt
+public/sitemap.xml

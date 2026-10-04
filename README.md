@@ -53,3 +53,19 @@ Références : [classes matérielles Windows CIM](https://learn.microsoft.com/en
 
 Validation de cette évolution : neuf tests réussis, compilation TypeScript/Vite réussie, lecture réelle Windows de cinq catégories, remplissage du brouillon, export JSON valide et affichage mobile vérifiés. Les requêtes sans origine ou depuis une autre origine sont refusées (403), les lectures GET sont refusées (405).
 
+
+## SEO et sitemap
+
+L’espace applicatif à la racine reste en noindex (meta + en-tête HTTP Vercel). Les données personnelles sont protégées par Firebase Auth et les règles Firestore : robots.txt et noindex ne sont pas des mécanismes de sécurité.
+
+Deux pages publiques sont générées en HTML complet sans JavaScript : /decouvrir et /guides/identifier-composants-pc. Elles ont un titre et une description uniques, un H1, une navigation HTML, les métadonnées Open Graph/Twitter, une image de partage et des données structurées WebSite/BreadcrumbList lorsqu’une adresse de production est disponible. Pas de faux avis, tarifs ou résultats enrichis promis.
+
+Sans domaine personnalisé, le build utilise automatiquement VERCEL_PROJECT_PRODUCTION_URL (adresse stable *.vercel.app). Activer les variables système Vercel si nécessaire. SITE_URL est un remplacement facultatif pour un futur domaine HTTPS, sans chemin. VERCEL_URL et les adresses de branche ne sont jamais utilisés comme adresse canonique. Le build produit sitemap.xml avec les seules pages publiques et robots.txt avec la déclaration du sitemap. Aucun lastmod de compilation arbitraire, aucune URL personnelle. En preview, en développement ou sans adresse de production, les pages restent noindex, robots.txt refuse le crawl et aucun sitemap public n’est publié. Un build avec une URL invalide échoue.
+
+Le sitemap et les pages sont générés par scripts/generate-seo.mjs avant le build. La liste des routes et le contenu sont dans scripts/seo.mjs. Les réécritures Vercel ciblent seulement les pages publiques : les URL inconnues ne renvoient plus artificiellement l’application avec un statut 200.
+
+Avant lancement : vérifier le domaine canonique et ses redirections HTTPS/www, ouvrir sitemap.xml et robots.txt en production, inspecter les URL publiques et envoyer le sitemap dans Google Search Console. Valider les données structurées et mesurer les Core Web Vitals sur le site déployé. Aucune vérification Search Console ni score de performance réel n’est revendiqué avant déploiement. Ajouter ensuite de nouveaux guides utiles au manifeste des pages publiques.
+
+Références : [variables système Vercel](https://vercel.com/docs/environment-variables/system-environment-variables), [Google : créer un sitemap](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap), [directives robots](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag), [SEO et JavaScript](https://developers.google.com/search/docs/crawling-indexing/javascript/javascript-seo-basics).
+
+Validation SEO : compilation réussie, 13 tests réussis (dont sitemap, previews et domaine stable Vercel), pages publiques et retour à l’application vérifiés dans le navigateur. Le sitemap est absent en local tant qu’aucune adresse de production n’est définie.
