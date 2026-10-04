@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Search, RefreshCw, ShieldCheck } from "lucide-react";
 import {
+  filterOffersByBudget,
   categories,
   categoryLabels,
   findPrices,
@@ -15,30 +16,45 @@ export default function PriceSearch({
   initialQuery = "",
   target,
   onSelect,
+  activation = 0,
+  savedReferences = [],
 }: {
   initialQuery?: string;
   target?: number;
   onSelect(query: string): void;
+  activation?: number;
+  savedReferences?: string[];
 }) {
   const [query, setQuery] = useState(initialQuery);
   const [category, setCategory] = useState<PriceCategory>(
     guessCategory(initialQuery),
   );
   const [result, setResult] = useState<PriceResult | null>(null);
-  const activeTarget = result?.query === initialQuery ? target : undefined;
+  const [maxBudget, setMaxBudget] = useState(target?.toString() ?? "");
+  const activeTarget =
+    maxBudget.trim() && Number(maxBudget) > 0 ? Number(maxBudget) : undefined;
+  const visibleOffers = filterOffersByBudget(
+    result?.offers ?? [],
+    activeTarget,
+  );
+  const hiddenCount = (result?.offers.length ?? 0) - visibleOffers.length;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const request = useRef<AbortController | null>(null);
   useEffect(() => {
     if (initialQuery) {
-      request.current?.abort(); setBusy(false);
+      request.current?.abort();
+      setBusy(false);
       setQuery(initialQuery);
       setCategory(guessCategory(initialQuery));
       setResult(null);
+      setMaxBudget(target?.toString() ?? "");
+      if (activation > 0)
+        void search(initialQuery, guessCategory(initialQuery));
     }
-  }, [initialQuery]);
+  }, [initialQuery, target, activation]);
   useEffect(() => () => request.current?.abort(), []);
-  async function search() {
+  async function search(searchQuery = query, searchCategory = category) {
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
@@ -46,7 +62,11 @@ export default function PriceSearch({
     setError("");
     setResult(null);
     try {
-      const data = await findPrices(query.trim(), category, controller.signal);
+      const data = await findPrices(
+        searchQuery.trim(),
+        searchCategory,
+        controller.signal,
+      );
       if (!controller.signal.aborted) setResult(data);
     } catch (e) {
       if (!controller.signal.aborted)
@@ -83,6 +103,8 @@ export default function PriceSearch({
             value={query}
             placeholder="Ex. Ryzen 7 5700X ou RX 9060 XT 16GB"
             onChange={(e) => {
+              request.current?.abort();
+              setBusy(false);
               setQuery(e.target.value);
               setCategory(guessCategory(e.target.value));
               setResult(null);
@@ -94,6 +116,8 @@ export default function PriceSearch({
           <select
             value={category}
             onChange={(e) => {
+              request.current?.abort();
+              setBusy(false);
               setCategory(e.target.value as PriceCategory);
               setResult(null);
             }}
@@ -105,11 +129,44 @@ export default function PriceSearch({
             ))}
           </select>
         </label>
+        <label>
+          Budget maximum (€), hors livraison
+          <input
+            type="number"
+            min="0.01"
+            max="100000"
+            step="0.01"
+            value={maxBudget}
+            placeholder="Sans limite"
+            onChange={(e) => setMaxBudget(e.target.value)}
+          />
+        </label>
         <button className="primary" disabled={busy || query.trim().length < 2}>
           <Search size={17} />
           {busy ? "Lecture des offres…" : "Comparer"}
         </button>
       </form>
+      <div className="price-budget-status" role="status">
+        {activeTarget ? (
+          <>
+            <strong>
+              Filtre actif : {euros(activeTarget)} maximum, hors livraison.
+            </strong>
+            <p>
+              Seules les offres à ce prix ou moins sont affichées. Le tri est du
+              moins cher au plus cher.
+            </p>
+            <button className="text-button" onClick={() => setMaxBudget("")}>
+              Retirer le filtre de budget
+            </button>
+          </>
+        ) : (
+          <>
+            <strong>Aucun filtre de budget.</strong>
+            <p>Renseignez un maximum pour masquer les offres trop chères.</p>
+          </>
+        )}
+      </div>
       {busy && (
         <p role="status">
           Consultation des catalogues et vérification des fiches produit…
@@ -124,8 +181,8 @@ export default function PriceSearch({
         <>
           <div className="price-results-heading">
             <strong>
-              {result.offers.length} offre(s) vérifiée(s) pour « {result.query}{" "}
-              »
+              {visibleOffers.length} offre(s) affichée(s) sur{" "}
+              {result.offers.length} vérifiée(s) pour « {result.query} »
             </strong>
             <button
               className="text-button"
@@ -143,8 +200,15 @@ export default function PriceSearch({
           </p>
           {activeTarget && (
             <p>
-              Votre objectif : {euros(activeTarget!)}. Les frais de port restent à
-              ajouter.
+              {hiddenCount} offre(s) au-dessus de {euros(activeTarget)}{" "}
+              masquée(s). Les frais de port ne sont pas inclus.
+            </p>
+          )}
+          {!!result.offers.length && !visibleOffers.length && (
+            <p role="status">
+              Aucune offre à {activeTarget ? euros(activeTarget) : "ce budget"}{" "}
+              ou moins dans les résultats vérifiés. Augmentez ou retirez le
+              budget pour voir les autres offres.
             </p>
           )}
           {!result.offers.length && (
@@ -155,7 +219,7 @@ export default function PriceSearch({
             </p>
           )}
           <div className="price-offers">
-            {result.offers.map((o, i) => (
+            {visibleOffers.map((o, i) => (
               <article className="price-offer" key={`${o.url}:${o.seller}`}>
                 <div>
                   <span className="offer-merchant">
@@ -203,9 +267,14 @@ export default function PriceSearch({
                   </a>
                   <button
                     className="text-button"
+                    disabled={savedReferences.includes(
+                      o.component.slice(0, 150),
+                    )}
                     onClick={() => onSelect(o.component)}
                   >
-                    Garder cette référence
+                    {savedReferences.includes(o.component.slice(0, 150))
+                      ? "Référence enregistrée sur cet appareil"
+                      : "Garder cette référence"}
                   </button>
                 </div>
               </article>

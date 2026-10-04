@@ -1564,3 +1564,31 @@ footer button:hover {
     padding: 16px;
   }
 }
+
+.price-budget-status {
+  padding: 14px 18px;
+  border: 1px solid #b9e57966;
+  border-radius: 12px;
+  margin: 16px 0;
+  background: #b9e5790a;
+}
+.price-budget-status p {
+  margin: 6px 0;
+  font-size: 13px;
+}
+.price-search-form {
+  grid-template-columns: minmax(160px, 2fr) minmax(120px, 1fr) minmax(
+      120px,
+      1fr
+    ) auto;
+}
+@media (max-width: 900px) {
+  .price-search-form {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .price-search-form {
+    grid-template-columns: 1fr;
+  }
+}

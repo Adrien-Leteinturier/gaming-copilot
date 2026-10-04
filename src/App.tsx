@@ -1,3 +1,4 @@
+import { readSavedReferences, keepReference } from "./prices";
 import AssistantText from "./components/AssistantText";
 import { quickReply } from "./agent/quick";
 import { recommendProfile } from "./recommendations";
@@ -101,6 +102,14 @@ export default function App({
   const [modelProgress, setModelProgress] = useState(0);
   const [liveReply, setLiveReply] = useState("");
   const [priceQuery, setPriceQuery] = useState("");
+  const [priceActivation, setPriceActivation] = useState(0);
+  const [savedReferences, setSavedReferences] = useState<string[]>(() =>
+    readSavedReferences("gc.savedRefs.guest"),
+  );
+  const referenceKey = "gc.savedRefs." + (user?.uid ?? "guest");
+  useEffect(() => {
+    setSavedReferences(readSavedReferences(referenceKey));
+  }, [referenceKey]);
   const [priceTarget, setPriceTarget] = useState<number | undefined>();
   const modelCancelRequested = useRef(false);
   const localAgent = useRef<Awaited<
@@ -231,10 +240,13 @@ export default function App({
       else
         localStorage.setItem("gc.alerts", JSON.stringify([...alerts, alert]));
       setAlerts([...alerts, alert]);
+      setPriceQuery(alert.component);
+      setPriceTarget(alert.target);
+      setPriceActivation((v) => v + 1);
       setComponent("");
       setTarget("");
       setNotice(
-        "Seuil enregistré. Utilisez « Comparer ce seuil » pour vérifier les offres actuelles.",
+        "Seuil enregistré et appliqué. La recherche affiche uniquement les offres dans votre budget, hors livraison.",
       );
     } catch (e) {
       report(e);
@@ -884,27 +896,110 @@ export default function App({
                   <PriceSearch
                     initialQuery={priceQuery}
                     target={priceTarget}
+                    activation={priceActivation}
+                    savedReferences={savedReferences}
                     onSelect={(query) => {
-                      setComponent(query.slice(0, 150));
-                      setNotice(
-                        "Référence ajoutée au formulaire. Choisissez votre seuil et enregistrez-le.",
-                      );
+                      try {
+                        const refs = keepReference(savedReferences, query);
+                        localStorage.setItem(
+                          referenceKey,
+                          JSON.stringify(refs),
+                        );
+                        setSavedReferences(refs);
+                        setComponent(query.slice(0, 150));
+                        setNotice(
+                          "Référence enregistrée dans votre liste sur cet appareil. Vous pouvez la comparer à nouveau ou définir un budget maximum.",
+                        );
+                      } catch {
+                        setNotice(
+                          "Impossible de garder la référence : le stockage de ce navigateur est indisponible.",
+                        );
+                      }
                     }}
                   />
+                  <section className="panel">
+                    <h3>Références gardées sur cet appareil</h3>
+                    <p>
+                      Conservées après rechargement dans ce navigateur,
+                      séparément pour chaque compte. Elles ne sont pas
+                      synchronisées entre appareils.
+                    </p>
+                    {savedReferences.length ? (
+                      savedReferences.map((ref) => (
+                        <div className="alert-row" key={ref}>
+                          <strong>{ref}</strong>
+                          <button
+                            className="secondary"
+                            onClick={() => {
+                              setPriceQuery(ref);
+                              setPriceTarget(undefined);
+                              setPriceActivation((v) => v + 1);
+                            }}
+                          >
+                            Comparer cette référence
+                          </button>
+                          <button
+                            aria-label={`Retirer la référence ${ref}`}
+                            onClick={() => {
+                              try {
+                                const next = savedReferences.filter(
+                                  (r) => r !== ref,
+                                );
+                                localStorage.setItem(
+                                  referenceKey,
+                                  JSON.stringify(next),
+                                );
+                                setSavedReferences(next);
+                              } catch {
+                                setNotice(
+                                  "La référence n’a pas pu être retirée.",
+                                );
+                              }
+                            }}
+                          >
+                            <Trash2 size={17} />
+                          </button>
+                          <button
+                            className="text-button"
+                            onClick={() => {
+                              setComponent(ref);
+                              document
+                                .getElementById("price-threshold-form")
+                                ?.scrollIntoView({ behavior: "smooth" });
+                            }}
+                          >
+                            Définir un seuil
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <p>
+                        Aucune référence gardée pour le moment. Le bouton «
+                        Garder cette référence » enregistre réellement votre
+                        sélection ici.
+                      </p>
+                    )}
+                  </section>
                   <div className="provider-banner">
                     <ShieldCheck />
                     <div>
                       <strong>Vérifiez vos prix à la demande.</strong>
                       <p>
-                        Les seuils servent à comparer vos objectifs aux offres
-                        lors d’une recherche. Aucune surveillance en
-                        arrière-plan ni notification automatique n’est activée.
+                        « Appliquer ce seuil et comparer » lance la recherche et
+                        masque les offres au-dessus du maximum. Le budget
+                        s’applique au prix du produit, hors livraison. Aucune
+                        surveillance en arrière-plan ni notification automatique
+                        n’est activée.
                       </p>
                     </div>
                     <span className="pill">Recherche active</span>
                   </div>
                   <div className="config-layout">
-                    <form className="panel config-form" onSubmit={addAlert}>
+                    <form
+                      id="price-threshold-form"
+                      className="panel config-form"
+                      onSubmit={addAlert}
+                    >
                       <h3>
                         <Bell size={20} /> Créer un seuil de prix
                       </h3>
@@ -919,7 +1014,7 @@ export default function App({
                         />
                       </label>
                       <label>
-                        Mon prix cible (€)
+                        Budget maximum (€), hors livraison
                         <input
                           required
                           type="number"
@@ -957,9 +1052,14 @@ export default function App({
                                 onClick={() => {
                                   setPriceQuery(a.component);
                                   setPriceTarget(a.target);
+                                  setPriceActivation((v) => v + 1);
+                                  window.scrollTo({
+                                    top: 0,
+                                    behavior: "smooth",
+                                  });
                                 }}
                               >
-                                Comparer ce seuil
+                                Appliquer ce seuil et comparer
                               </button>
                             </div>
                             <button

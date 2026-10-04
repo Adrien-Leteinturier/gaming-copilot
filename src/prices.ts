@@ -101,3 +101,25 @@ export async function findPrices(
     throw Error(data.error ?? "La recherche de prix est indisponible.");
   return priceResultSchema.parse(data);
 }
+
+export function filterOffersByBudget(
+  offers: Offer[],
+  budget?: number,
+): Offer[] {
+  return offers
+    .filter((o) => budget === undefined || o.amount <= budget)
+    .sort((a, b) => a.amount - b.amount);
+}
+export function readSavedReferences(key: string): string[] {
+  try {
+    const data: unknown = JSON.parse(localStorage.getItem(key) ?? "[]");
+    return z.array(z.string().trim().min(1).max(150)).max(50).parse(data);
+  } catch {
+    return [];
+  }
+}
+export function keepReference(current: string[], query: string): string[] {
+  const value = query.trim().slice(0, 150);
+  if (!value) return current;
+  return [value, ...current.filter((item) => item !== value)].slice(0, 50);
+}
