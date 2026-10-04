@@ -1,3 +1,4 @@
+import { withDeadline } from "./timeout";
 import { quickReply } from "./quick";
 import {
   CreateWebWorkerMLCEngine,
@@ -37,17 +38,31 @@ export async function loadLocalModel(
     });
     try {
       engine = await Promise.race([
-        CreateWebWorkerMLCEngine(worker, modelIds[mode], {
-          initProgressCallback: progress,
-          logLevel: "WARN",
-        }),
+        withDeadline(
+          CreateWebWorkerMLCEngine(worker, modelIds[mode], {
+            initProgressCallback: progress,
+            logLevel: "WARN",
+          }),
+          180000,
+          () => {
+            worker?.terminate();
+            worker = null;
+            engine = null;
+          },
+          "MODEL_TIMEOUT : le chargement a dépassé trois minutes. Vérifiez la connexion puis réessayez.",
+        ),
         cancellation,
       ]);
     } catch (e) {
       worker?.terminate();
       worker = null;
       engine = null;
-      if (e instanceof Error && e.message === "MODEL_LOAD_CANCELLED") throw e;
+      if (
+        e instanceof Error &&
+        (e.message === "MODEL_LOAD_CANCELLED" ||
+          e.message.includes("MODEL_TIMEOUT"))
+      )
+        throw e;
       throw Error(
         "Le modèle n’a pas pu être chargé. Vérifiez votre connexion, l’espace disponible et la mémoire graphique, puis réessayez.",
       );
@@ -71,19 +86,32 @@ export async function localReply(
   if (direct !== null) return direct;
   if (!engine) throw Error("Chargez d’abord le modèle gratuit.");
   const context = await assistantContext(config, question);
-  const stream = await engine.chat.completions.create({
-    messages: localMessages(question, history, context),
-    stream: true,
-    max_tokens: 600,
-    temperature: 0.7,
-    ...(engine.modelId?.includes(modelIds.light)
-      ? { extra_body: { enable_thinking: false }, presence_penalty: 1.5 }
-      : {}),
-  });
-  let text = "";
-  for await (const chunk of stream) {
-    text += chunk.choices[0]?.delta.content ?? "";
-  }
+  const activeEngine = engine;
+  let text = await withDeadline(
+    (async () => {
+      const stream = await activeEngine.chat.completions.create({
+        messages: localMessages(question, history, context),
+        stream: true,
+        max_tokens: 600,
+        temperature: 0.7,
+        ...(activeEngine.modelId?.includes(modelIds.light)
+          ? { extra_body: { enable_thinking: false }, presence_penalty: 1.5 }
+          : {}),
+      });
+      let text = "";
+      for await (const chunk of stream) {
+        text += chunk.choices[0]?.delta.content ?? "";
+      }
+      return text;
+    })(),
+    90000,
+    () => {
+      worker?.terminate();
+      worker = null;
+      engine = null;
+    },
+    "MODEL_TIMEOUT : le calcul n’a pas terminé sur cet appareil après 90 secondes. Rechargez le modèle pour réessayer.",
+  );
   text = cleanModelReply(text);
   if (!text.trim())
     throw Error("Aucune réponse générée. Essayez une question plus courte.");

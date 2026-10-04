@@ -62,3 +62,6 @@ Le résultat retourne vers l’URL de production fixe dans un fragment base64url
 
 ### Assistant après rechargement
 Le formulaire permet d’envoyer une question même sans modèle chargé. Les diagnostics déterministes et les prix consultent directement les outils légers. Une question générale reste dans le formulaire et propose « Charger et répondre » avec le volume du modèle ; aucun téléchargement automatique. Après activation explicite, le chargement est suivi de la réponse à la question conservée. Le modèle est toujours libéré au rechargement pour ne pas charger automatiquement le GPU des visiteurs.
+
+### Retour visible à l’envoi
+Toute question apparaît immédiatement dans le chat. Si le modèle est nécessaire, son activation explicite est proposée près de la question et sur le bouton du formulaire, avec volume annoncé. Progression et erreurs sont aussi visibles dans la conversation. Le chargement est borné à trois minutes et la génération à 90 secondes, puis le worker est arrêté et la question conservée pour réessayer. Aucun téléchargement automatique.

@@ -85,6 +85,12 @@ export default function App({
   const [busy, setBusy] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [pendingQuestion, setPendingQuestion] = useState("");
+  const [assistantError, setAssistantError] = useState("");
+  const chatEnd = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (page === "Assistant")
+      chatEnd.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [page, pendingQuestion, messages, busy, assistantError]);
   const [component, setComponent] = useState("");
   const [target, setTarget] = useState("");
   const [modelMode, setModelMode] = useState<ModelMode>("light");
@@ -106,6 +112,7 @@ export default function App({
     const questionToAnswer = pendingQuestion;
     const loadingUid = userUid.current;
     modelCancelRequested.current = false;
+    setAssistantError("");
     setModelState("loading");
     setModelProgress(0);
     try {
@@ -131,6 +138,9 @@ export default function App({
         );
       } else {
         setModelState("error");
+        setAssistantError(
+          e instanceof Error ? e.message : "Le modèle n’a pas pu démarrer.",
+        );
         report(e);
       }
     }
@@ -246,7 +256,11 @@ export default function App({
   }
   async function ask(e: React.FormEvent) {
     e.preventDefault();
-    if (!prompt.trim() || busy) return;
+    if (!prompt.trim() || busy || modelState === "loading") return;
+    if (pendingQuestion === prompt.trim() && modelState !== "ready") {
+      await initializeModel();
+      return;
+    }
     await answerQuestion(
       prompt.trim(),
       modelState === "ready" ? localAgent.current : null,
@@ -258,6 +272,8 @@ export default function App({
   ) {
     const askingUid = user?.uid ?? null;
     setBusy(true);
+    setPendingQuestion(question);
+    setAssistantError("");
     setLiveReply("");
     try {
       let reply = await quickReply(question, config);
@@ -289,6 +305,13 @@ export default function App({
       if (user) await saveMessages(user.uid, next);
       else localStorage.setItem("gc.messages", JSON.stringify(next));
     } catch (e) {
+      setAssistantError(
+        e instanceof Error
+          ? e.message
+          : "La réponse a échoué. Votre question est conservée.",
+      );
+      if (e instanceof Error && e.message.includes("MODEL_TIMEOUT"))
+        setModelState("error");
       report(e);
     } finally {
       setBusy(false);
@@ -681,7 +704,14 @@ export default function App({
                               "Que vérifier avant un upgrade ?",
                               "Aide-moi à régler mon jeu",
                             ].map((s) => (
-                              <button key={s} onClick={() => setPrompt(s)}>
+                              <button
+                                key={s}
+                                onClick={() => {
+                                  setPrompt(s);
+                                  setPendingQuestion("");
+                                  setAssistantError("");
+                                }}
+                              >
                                 {s}
                                 <ArrowUpRight size={14} />
                               </button>
@@ -703,6 +733,77 @@ export default function App({
                         ))
                       )}
                     </div>
+                    {pendingQuestion && (
+                      <div className="pending-assistant" aria-live="polite">
+                        <div className="message user">
+                          <small>Vous</small>
+                          <p>{pendingQuestion}</p>
+                        </div>
+                        {assistantError ? (
+                          <div className="message assistant" role="alert">
+                            <small>Copilot · réponse interrompue</small>
+                            <p>{assistantError}</p>
+                            <p>
+                              Votre question est conservée. Vous pouvez
+                              réessayer ou utiliser l’analyse de configuration
+                              sans modèle.
+                            </p>
+                          </div>
+                        ) : (
+                          !busy &&
+                          modelState !== "ready" && (
+                            <div className="message assistant">
+                              <small>Copilot</small>
+                              {modelState === "loading" ? (
+                                <>
+                                  <p>
+                                    Chargement du modèle sur cet appareil :{" "}
+                                    {modelProgress} %. La réponse démarrera
+                                    automatiquement.
+                                  </p>
+                                  <progress
+                                    value={modelProgress}
+                                    max={100}
+                                    aria-label="Chargement du modèle"
+                                  />
+                                  <button
+                                    className="secondary"
+                                    onClick={() => {
+                                      modelCancelRequested.current = true;
+                                      localAgent.current?.cancelLocalModelLoad();
+                                    }}
+                                  >
+                                    Arrêter le chargement
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <p>
+                                    Pour répondre à cette question, activez le
+                                    modèle gratuit sur votre appareil.{" "}
+                                    {modelMode === "light"
+                                      ? "Environ 400 Mo et 1,5 Go de mémoire graphique"
+                                      : "Environ 900 Mo et 2 Go de mémoire graphique"}{" "}
+                                    ; Chrome ou Edge compatible WebGPU requis.
+                                    Aucun téléchargement avant votre clic.
+                                  </p>
+                                  <button
+                                    className="primary"
+                                    onClick={() => void initializeModel()}
+                                  >
+                                    Charger et répondre (
+                                    {modelMode === "light"
+                                      ? "~400 Mo"
+                                      : "~900 Mo"}
+                                    )
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )
+                        )}
+                      </div>
+                    )}
                     {busy && (
                       <div className="message assistant" role="status">
                         <small>Copilot · en cours</small>
@@ -715,15 +816,18 @@ export default function App({
                         </button>
                       </div>
                     )}
+                    <div ref={chatEnd} />
                     <form className="composer" onSubmit={ask}>
                       <input
                         aria-label="Votre question"
                         maxLength={2000}
                         placeholder="Demandez quelque chose à votre copilote…"
                         value={prompt}
+                        disabled={busy || modelState === "loading"}
                         onChange={(e) => {
                           setPrompt(e.target.value);
                           setPendingQuestion("");
+                          setAssistantError("");
                         }}
                       />
                       <button
@@ -731,9 +835,17 @@ export default function App({
                         disabled={
                           busy || !prompt.trim() || modelState === "loading"
                         }
-                        aria-label="Envoyer"
+                        aria-label={
+                          pendingQuestion && modelState !== "ready"
+                            ? `Charger et répondre (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`
+                            : "Envoyer"
+                        }
                       >
-                        <Send size={18} />
+                        {pendingQuestion && modelState !== "ready" ? (
+                          `Charger et répondre (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`
+                        ) : (
+                          <Send size={18} />
+                        )}
                       </button>
                     </form>
                     <small className="chat-note">
