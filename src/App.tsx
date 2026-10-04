@@ -95,7 +95,15 @@ export default function App({
   }, [page, pendingQuestion, messages, busy, assistantError]);
   const [component, setComponent] = useState("");
   const [target, setTarget] = useState("");
-  const [modelMode, setModelMode] = useState<ModelMode>("light");
+  const [modelMode, setModelMode] = useState<ModelMode>(() => {
+    try {
+      return localStorage.getItem("gc.modelMode") === "balanced"
+        ? "balanced"
+        : "light";
+    } catch {
+      return "light";
+    }
+  });
   const [modelState, setModelState] = useState<
     "idle" | "loading" | "ready" | "error"
   >("idle");
@@ -118,7 +126,37 @@ export default function App({
   function importLocalAgent() {
     return import("./agent/local");
   }
+  const [cachedModes, setCachedModes] = useState<ModelMode[]>([]);
+  const [cacheChecked, setCacheChecked] = useState(false);
+  const modelCached = cachedModes.includes(modelMode);
+  const modelAction = modelCached
+    ? "Réutiliser le modèle enregistré"
+    : `Télécharger le modèle (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`;
+  useEffect(() => {
+    if (page !== "Assistant") return;
+    let active = true;
+    void importLocalAgent()
+      .then(async (agent) => {
+        const cached = await agent.cachedModelModes();
+        if (!active) return;
+        setCachedModes(cached);
+        setCacheChecked(true);
+        if (
+          modelState === "idle" &&
+          cached.length &&
+          !cached.includes(modelMode)
+        )
+          setModelMode(cached[0]);
+      })
+      .catch(() => {
+        if (active) setCacheChecked(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [page, modelState]);
   async function initializeModel() {
+    if (!cacheChecked || modelState === "loading" || modelState === "ready") return;
     const questionToAnswer = pendingQuestion;
     const loadingUid = userUid.current;
     modelCancelRequested.current = false;
@@ -135,6 +173,12 @@ export default function App({
         ),
       );
       setModelState("ready");
+      try {
+        localStorage.setItem("gc.modelMode", modelMode);
+      } catch {
+        /* Storage may be unavailable. */
+      }
+      setCachedModes(await agent.cachedModelModes());
       setNotice(
         "Modèle prêt. Les réponses sont calculées sur cet appareil, sans API payante.",
       );
@@ -620,6 +664,19 @@ export default function App({
                           navigateur le permet.
                         </p>
                       </div>
+                      <p role="status">
+                        {!cacheChecked
+                          ? "Vérification des modèles enregistrés…"
+                          : modelCached
+                            ? "Modèle présent sur cet appareil : ses fichiers seront réutilisés. Le démarrage remet le modèle en mémoire graphique."
+                            : "Ce modèle n’est pas conservé intégralement dans ce navigateur. Son téléchargement nécessite votre clic."}{" "}
+                        {cacheChecked &&
+                          cachedModes.length > 0 &&
+                          `Modèles en cache : ${cachedModes.map((mode) => (mode === "light" ? "Qwen3 0.6B" : "Qwen 1.5B")).join(", ")}.`}{" "}
+                        Aucun autre modèle n’est téléchargé automatiquement.
+                        Libérer la mémoire conserve les fichiers ; effacer les
+                        données du site peut les supprimer.
+                      </p>
                       <label>
                         Mode
                         <select
@@ -629,9 +686,15 @@ export default function App({
                             modelState === "ready" ||
                             busy
                           }
-                          onChange={(e) =>
-                            setModelMode(e.target.value as ModelMode)
-                          }
+                          onChange={(e) => {
+                            const mode = e.target.value as ModelMode;
+                            setModelMode(mode);
+                            try {
+                              localStorage.setItem("gc.modelMode", mode);
+                            } catch {
+                              /* Optional preference. */
+                            }
+                          }}
                         >
                           <option value="light">
                             Léger · environ 400 Mo · réponses simples
@@ -681,14 +744,16 @@ export default function App({
                       ) : (
                         <button
                           className="primary"
-                          disabled={busy}
+                          disabled={busy || !cacheChecked}
                           onClick={() => void initializeModel()}
                         >
                           {pendingQuestion
-                            ? `Charger et répondre (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`
+                            ? modelCached
+                              ? "Réutiliser et répondre"
+                              : `Télécharger et répondre (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`
                             : modelState === "error"
                               ? "Réessayer le chargement"
-                              : `Charger le modèle gratuit (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`}
+                              : modelAction}
                         </button>
                       )}
                       <small>
@@ -808,11 +873,9 @@ export default function App({
                                     className="primary"
                                     onClick={() => void initializeModel()}
                                   >
-                                    Charger et répondre (
-                                    {modelMode === "light"
-                                      ? "~400 Mo"
-                                      : "~900 Mo"}
-                                    )
+                                    {modelCached
+                                      ? "Réutiliser et répondre"
+                                      : modelAction}
                                   </button>
                                 </>
                               )}
@@ -854,12 +917,18 @@ export default function App({
                         }
                         aria-label={
                           pendingQuestion && !busy && modelState !== "ready"
-                            ? `Charger et répondre (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`
+                            ? modelCached
+                              ? "Réutiliser et répondre"
+                              : `Télécharger et répondre (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`
                             : "Envoyer"
                         }
                       >
                         {pendingQuestion && !busy && modelState !== "ready" ? (
-                          `Charger et répondre (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`
+                          modelCached ? (
+                            "Réutiliser et répondre"
+                          ) : (
+                            `Télécharger et répondre (${modelMode === "light" ? "~400 Mo" : "~900 Mo"})`
+                          )
                         ) : (
                           <Send size={18} />
                         )}

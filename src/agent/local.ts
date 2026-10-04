@@ -2,6 +2,7 @@ import { withDeadline } from "./timeout";
 import { quickReply } from "./quick";
 import {
   CreateWebWorkerMLCEngine,
+  hasModelInCache,
   type WebWorkerMLCEngine,
   type InitProgressReport,
 } from "@mlc-ai/web-llm";
@@ -135,4 +136,18 @@ export async function unloadLocalModel() {
 
 export function cancelLocalModelLoad() {
   cancelLoading?.();
+}
+
+export async function cachedModelModes(): Promise<ModelMode[]> {
+  const modes = Object.keys(modelIds) as ModelMode[];
+  const results = await Promise.all(
+    modes.map(async (mode) => {
+      try {
+        return (await hasModelInCache(modelIds[mode])) ? mode : null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return results.filter((mode): mode is ModelMode => mode !== null);
 }
