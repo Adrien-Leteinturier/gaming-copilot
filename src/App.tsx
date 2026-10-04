@@ -156,7 +156,8 @@ export default function App({
     };
   }, [page, modelState]);
   async function initializeModel() {
-    if (!cacheChecked || modelState === "loading" || modelState === "ready") return;
+    if (!cacheChecked || modelState === "loading" || modelState === "ready")
+      return;
     const questionToAnswer = pendingQuestion;
     const loadingUid = userUid.current;
     modelCancelRequested.current = false;
@@ -333,7 +334,9 @@ export default function App({
     setAssistantError("");
     setLiveReply("");
     try {
-      let reply = await quickReply(question, config, messages);
+      let reply = agent
+        ? await agent.localReply(question, messages, config, setLiveReply)
+        : await quickReply(question, config, messages);
       if (reply === null) {
         if (!agent) {
           setPendingQuestion(question);
@@ -650,18 +653,18 @@ export default function App({
                       </span>
                       <div>
                         <strong>Gaming Copilot</strong>
-                        <small>Gratuit · calculé sur votre appareil</small>
+                        <small>{modelState === "ready" ? "Conversation IA · modèle local actif" : "Conseils vérifiés · activez le modèle pour discuter"}</small>
                       </div>
                     </div>
                     <div className="local-model-panel">
                       <div>
                         <strong>Un assistant qui tourne chez vous.</strong>
                         <p>
-                          Analyse de configuration et prix disponibles
-                          immédiatement. Pour les autres questions : aucune clé
-                          API, aucun coût par question. Le modèle se télécharge
-                          uniquement après votre clic et reste en cache si le
-                          navigateur le permet.
+                          Conseils vérifiés disponibles immédiatement. Activez
+                          le modèle pour une conversation adaptée à vos
+                          questions : aucune clé API, aucun coût par question.
+                          Le modèle se télécharge uniquement après votre clic et
+                          reste en cache si le navigateur le permet.
                         </p>
                       </div>
                       <p role="status">
@@ -700,7 +703,7 @@ export default function App({
                             Léger · environ 400 Mo · réponses simples
                           </option>
                           <option value="balanced">
-                            Plus précis · environ 900 Mo
+                            Conversation · environ 900 Mo
                           </option>
                         </select>
                       </label>
@@ -935,8 +938,8 @@ export default function App({
                       </button>
                     </form>
                     <small className="chat-note">
-                      Le mode léger répond à des questions simples et peut se
-                      tromper. Vérifiez les conseils sur les fiches
+                      Le mode Conversation est conseillé pour suivre un échange.
+                      Le mode léger reste limité et les deux peuvent se tromper. Vérifiez les conseils sur les fiches
                       constructeur. Aucun FPS mesuré n’est déduit du matériel.
                     </small>
                   </section>

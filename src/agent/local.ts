@@ -7,7 +7,12 @@ import {
   type InitProgressReport,
 } from "@mlc-ai/web-llm";
 import type { Message, PcConfig } from "../domain";
-import { assistantContext, localMessages, cleanModelReply } from "./context";
+import {
+  assistantContext,
+  localMessages,
+  cleanModelReply,
+  groundedReply,
+} from "./context";
 export const modelIds = {
   light: "Qwen3-0.6B-q4f16_1-MLC",
   balanced: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
@@ -83,19 +88,25 @@ export async function localReply(
   config: PcConfig,
   onText: (text: string) => void,
 ) {
-  const direct = await quickReply(question, config, history);
-  if (direct !== null) return direct;
+  const evidence = await quickReply(question, config, history);
+  // Merchant results remain exact, source-attributed data, never rewritten by the model.
+  if (
+    evidence &&
+    /Offres relevées|Offres vérifiées/i.test(evidence) &&
+    /prix|co[uû]t|tarif|offres?/i.test(question)
+  )
+    return evidence;
   if (!engine) throw Error("Chargez d’abord le modèle gratuit.");
   const context = await assistantContext(config, question);
   const activeEngine = engine;
   let text = await withDeadline(
     (async () => {
       const stream = await activeEngine.chat.completions.create({
-        messages: localMessages(question, history, context),
+        messages: localMessages(question, history, context, evidence ?? ""),
         stream: true,
-        max_tokens: 600,
+        max_tokens: 800,
         temperature: 0.2,
-        ...(activeEngine.modelId?.includes(modelIds.light)
+        ...(activeEngine.modelId?.some((id) => id.includes("Qwen3"))
           ? { extra_body: { enable_thinking: false }, presence_penalty: 0 }
           : {}),
       });
@@ -116,11 +127,18 @@ export async function localReply(
   text = cleanModelReply(text);
   if (!text.trim())
     throw Error("Aucune réponse générée. Essayez une question plus courte.");
-  if (/\b\d+(?:[.,]\d+)?\s*(?:fps|images par seconde|€|euros?|%)/i.test(text)) {
-    text =
-      "Je ne dispose pas de benchmark vérifié pour annoncer des FPS ou un gain de performance. Votre objectif FPS reste une cible. Mesurez une scène reproductible avant et après chaque changement ; pour un achat, consultez la page Prix qui relève des offres marchandes.";
-    onText(text);
-  }
+  text = groundedReply(
+    text,
+    [
+      question,
+      context,
+      evidence ?? "",
+      ...history
+        .filter((m) => m.role === "user")
+        .slice(-8)
+        .map((m) => m.content),
+    ].join("\n"),
+  );
   onText(text);
   return text.trim();
 }
