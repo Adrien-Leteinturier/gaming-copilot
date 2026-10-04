@@ -1,3 +1,4 @@
+import { recommendProfile } from "../recommendations";
 import {
   Cpu,
   Monitor,
@@ -15,6 +16,7 @@ type Props = {
   config: PcConfig;
   alertsCount: number;
   openConfig: () => void;
+  detectHardware: () => void;
   openAssistant: () => void;
   openPrices: () => void;
 };
@@ -96,9 +98,11 @@ export default function Dashboard({
   config,
   alertsCount,
   openConfig,
+  detectHardware,
   openAssistant,
   openPrices,
 }: Props) {
+  const profile = recommendProfile(config);
   const filled = rows.filter((row) => config[row.key]).length;
   return (
     <div className="dashboard-flow">
@@ -113,10 +117,10 @@ export default function Dashboard({
             Plus de jeu.
           </h2>
           <p>
-            Identifiez vos composants depuis Windows ou importez votre rapport
-            matériel.
+            Un clic pour identifier les informations accessibles et préparer
+            votre profil de jeu.
           </p>
-          <button className="primary" onClick={openConfig}>
+          <button className="primary" onClick={detectHardware}>
             Identifier mon matériel <ArrowUpRight size={18} />
           </button>
           <span className="scan-footnote">
@@ -169,21 +173,28 @@ export default function Dashboard({
         <div className="overview-right">
           <section className="objective-panel">
             <div className="section-title">
-              <h3>Le jeu, à votre façon.</h3>
+              <h3>Votre profil conseillé.</h3>
               <Monitor size={20} />
             </div>
             <div className="objective-values">
               <span>
-                {config.resolution}
-                <small>Résolution cible</small>
+                {profile.resolution}
+                <small>Résolution de départ</small>
               </span>
               <span>
-                {config.targetFps}
-                <small>Objectif FPS</small>
+                {profile.fps}
+                <small>FPS à viser, non mesurés</small>
               </span>
             </div>
             <div className="objective-bottom">
-              <p>Vos objectifs, pas des performances mesurées.</p>
+              <div>
+                <p>Qualité : {profile.quality} · Ray tracing désactivé</p>
+                <p>{profile.reason}</p>
+                <p>
+                  Si l’écran est limité à une résolution inférieure, utilisez
+                  celle-ci. Confirmez la fluidité en jeu.
+                </p>
+              </div>
               <button
                 className="text-link"
                 onClick={openConfig}

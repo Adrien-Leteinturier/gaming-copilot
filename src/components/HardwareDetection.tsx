@@ -1,33 +1,55 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ScanLine,
   Upload,
   Download,
-  Check,
   LoaderCircle,
   RotateCcw,
 } from "lucide-react";
 import { fields, type PcConfig } from "../domain";
 import {
+  detectBrowserHardware,
   hardwareReportSchema,
   readHardwareFile,
   type HardwareReport,
 } from "../hardware";
 
-type Props = { onApply: (report: HardwareReport) => void; config: PcConfig };
+type Props = {
+  onApply: (report: HardwareReport) => Promise<void>;
+  config: PcConfig;
+  autoStart?: boolean;
+};
 const local = ["localhost", "127.0.0.1"].includes(window.location.hostname);
-export default function HardwareDetection({ onApply, config }: Props) {
+export default function HardwareDetection({
+  onApply,
+  config,
+  autoStart,
+}: Props) {
   const [report, setReport] = useState<HardwareReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [applied, setApplied] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const started = useRef(false);
+  useEffect(() => {
+    if (autoStart && !started.current) {
+      started.current = true;
+      void detect();
+    }
+  }, [autoStart]);
   async function detect() {
     setBusy(true);
     setError("");
     setApplied(false);
     setReport(null);
     try {
+      if (!local) {
+        const detected = await detectBrowserHardware();
+        setReport(detected);
+        await onApply(detected);
+        setApplied(true);
+        return;
+      }
       const response = await fetch("/api/hardware", {
         method: "POST",
         signal: AbortSignal.timeout(30000),
@@ -39,7 +61,10 @@ export default function HardwareDetection({ onApply, config }: Props) {
       const data = await response.json();
       if (!response.ok)
         throw new Error(data.error ?? "Détection indisponible.");
-      setReport(hardwareReportSchema.parse(data));
+      const detected = hardwareReportSchema.parse(data);
+      setReport(detected);
+      await onApply(detected);
+      setApplied(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Détection indisponible.");
     } finally {
@@ -52,7 +77,10 @@ export default function HardwareDetection({ onApply, config }: Props) {
     setApplied(false);
     setReport(null);
     try {
-      setReport(await readHardwareFile(file));
+      const detected = await readHardwareFile(file);
+      setReport(detected);
+      await onApply(detected);
+      setApplied(true);
     } catch {
       setError(
         "Rapport invalide. Importez le fichier JSON généré par le collecteur Gaming Copilot (64 Ko maximum).",
@@ -74,14 +102,14 @@ export default function HardwareDetection({ onApply, config }: Props) {
           <h2 id="detection-title">Détection du matériel</h2>
           <p>
             {local
-              ? "Lisez les composants depuis Windows, puis vérifiez le résultat."
-              : "Importez un inventaire Windows pour remplir votre configuration sans tout recopier."}
+              ? "Un clic pour identifier et enregistrer les composants accessibles depuis Windows."
+              : "Un clic pour lire les informations accessibles au navigateur et remplir votre fiche."}
           </p>
         </div>
-        <span className="platform-tag">WINDOWS</span>
+        <span className="platform-tag">{local ? "WINDOWS" : "NAVIGATEUR"}</span>
       </div>
       <div className="detection-controls">
-        {local && (
+        {
           <button className="primary" disabled={busy} onClick={detect}>
             {busy ? (
               <LoaderCircle className="spinning" size={17} />
@@ -96,37 +124,44 @@ export default function HardwareDetection({ onApply, config }: Props) {
                 ? "Relancer la détection"
                 : "Détecter ce PC"}
           </button>
-        )}
-        <button
-          className="secondary"
-          disabled={busy}
-          onClick={() => input.current?.click()}
-        >
-          <Upload size={16} />
-          Importer un rapport
-        </button>
-        <a className="text-link" href="/detect-hardware.ps1" download>
-          <Download size={15} />
-          Collecteur Windows
-        </a>
-        <input
-          className="visually-hidden"
-          ref={input}
-          type="file"
-          accept=".json,application/json"
-          aria-label="Rapport matériel Windows"
-          onChange={(e) => void importFile(e.target.files?.[0])}
-        />
+        }
+        <details className="collector-help">
+          <summary>Compléter l’inventaire Windows</summary>
+          <button
+            className="secondary"
+            disabled={busy}
+            onClick={() => input.current?.click()}
+          >
+            <Upload size={16} />
+            Importer un rapport
+          </button>
+          <a className="text-link" href="/detect-hardware.ps1" download>
+            <Download size={15} />
+            Collecteur Windows
+          </a>
+          <input
+            className="visually-hidden"
+            ref={input}
+            type="file"
+            accept=".json,application/json"
+            aria-label="Rapport matériel Windows"
+            onChange={(e) => void importFile(e.target.files?.[0])}
+          />
+        </details>
       </div>
-      <p className="detection-privacy">
-        Lecture seule. Aucun numéro de série collecté. Rien n’est enregistré
-        dans votre compte avant confirmation.
-      </p>
-      {error && (
-        <p className="inline-error" role="alert">
-          {error}
+      <details>
+        <summary>Compléter avec un rapport Windows</summary>
+        <p className="detection-privacy">
+          Lecture seule. Aucun numéro de série collecté. La détection remplit et
+          enregistre votre fiche dans votre espace ; vous pouvez ensuite la
+          corriger.
         </p>
-      )}
+        {error && (
+          <p className="inline-error" role="alert">
+            {error}
+          </p>
+        )}
+      </details>
       {report && (
         <div className="scan-result">
           <div className="section-title">
@@ -147,41 +182,35 @@ export default function HardwareDetection({ onApply, config }: Props) {
                     {value ??
                       (key === "psu"
                         ? "À compléter : non accessible depuis Windows"
-                        : "Non remonté par Windows")}
+                        : "Non accessible à cette détection")}
                     {value && old && value !== old && (
                       <small>Remplace : {old}</small>
                     )}
                   </dd>
                   <span className={value ? "detected-tag" : "unknown-tag"}>
-                    {value ? "Lu par Windows" : "À vérifier"}
+                    {value
+                      ? report.platform === "windows"
+                        ? "Lu par Windows"
+                        : "GPU du navigateur"
+                      : "À vérifier"}
                   </span>
                 </div>
               );
             })}
           </dl>
-          {report.warnings.length > 1 && (
-            <p className="scan-warning">
-              {report.warnings.length - 1} remarque(s) de collecte : vérifiez
-              les références, notamment si plusieurs GPU ou disques sont
-              présents.
-            </p>
+          {report.warnings.length > 0 && (
+            <p className="scan-warning">{report.warnings.join(" ")}</p>
           )}
           <div className="scan-bottom">
             <p>
-              Les champs non détectés, votre nom de setup et vos objectifs sont
-              conservés.
+              Les composants non accessibles et le nom du setup sont conservés.
+              Le profil de départ est recalculé automatiquement.
             </p>
-            <button
-              className="primary"
-              disabled={busy || applied || count === 0}
-              onClick={() => {
-                onApply(report);
-                setApplied(true);
-              }}
-            >
-              <Check size={17} />
-              {applied ? "Ajouté à la fiche" : "Utiliser ces composants"}
-            </button>
+            <span>
+              {applied
+                ? "Fiche mise à jour automatiquement"
+                : "Enregistrement non effectué : relancez la détection"}
+            </span>
           </div>
         </div>
       )}

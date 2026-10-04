@@ -1,3 +1,4 @@
+import { recommendProfile } from "./recommendations";
 import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import {
@@ -265,11 +266,24 @@ export default function App() {
       setLiveReply("");
     }
   }
-  const applyDetected = (report: HardwareReport) => {
-    setDraft((current) => applyHardwareReport(current, report));
-    setManualOpen(true);
+  const [detectOnOpen, setDetectOnOpen] = useState(false);
+  const applyDetected = async (report: HardwareReport) => {
+    setDetectOnOpen(false);
+    const next = applyHardwareReport(draft, report);
+    const profile = recommendProfile(next);
+    const value = configSchema.parse({
+      ...next,
+      resolution: profile.resolution,
+      targetFps: profile.fps,
+    });
+    if (user) await saveConfig(user.uid, value);
+    else localStorage.setItem("gc.config", JSON.stringify(value));
+    setDraft(value);
+    setConfig(value);
     setNotice(
-      "Composants ajoutés à la fiche. Vérifiez-les, puis enregistrez votre configuration.",
+      report.platform === "browser"
+        ? "Détection partielle terminée. Fiche et profil de départ mis à jour."
+        : "Matériel enregistré. Profil de départ calculé automatiquement.",
     );
   };
   const filled = Object.keys(fields).filter((k) =>
@@ -362,7 +376,7 @@ export default function App() {
               {page === "Dashboard"
                 ? "Tout votre matériel au même endroit. La suite, c’est vous qui décidez."
                 : page === "Ma Config"
-                  ? "Détection Windows, import de rapport ou saisie manuelle : choisissez ce qui vous convient."
+                  ? "Lancez la détection : votre fiche se remplit et votre profil de jeu est proposé automatiquement."
                   : page === "Assistant"
                     ? "Une question de compatibilité, de réglages ou de prochain achat ?"
                     : "Gardez les composants que vous cherchez et le budget que vous leur accordez."}
@@ -385,13 +399,21 @@ export default function App() {
                   config={config}
                   alertsCount={alerts.length}
                   openConfig={() => setPage("Ma Config")}
+                  detectHardware={() => {
+                    setDetectOnOpen(true);
+                    setPage("Ma Config");
+                  }}
                   openAssistant={() => setPage("Assistant")}
                   openPrices={() => setPage("Prix")}
                 />
               )}
               {page === "Ma Config" && (
                 <>
-                  <HardwareDetection config={draft} onApply={applyDetected} />
+                  <HardwareDetection
+                    config={draft}
+                    onApply={applyDetected}
+                    autoStart={detectOnOpen}
+                  />
                   <details
                     className="manual-editor"
                     open={manualOpen}
@@ -439,7 +461,7 @@ export default function App() {
                             </label>
                           ))}
                           <label>
-                            Résolution cible
+                            Résolution personnalisée (optionnel)
                             <select
                               value={draft.resolution}
                               onChange={(e) =>
@@ -456,7 +478,7 @@ export default function App() {
                             </select>
                           </label>
                           <label>
-                            Objectif FPS
+                            Fluidité souhaitée (optionnel)
                             <input
                               type="number"
                               min={30}
@@ -486,8 +508,9 @@ export default function App() {
                           compatibilité.
                         </p>
                         <p>
-                          Les FPS indiqués sont votre objectif. Aucun benchmark
-                          n’est déduit de votre configuration.
+                          Le profil automatique est une estimation de départ.
+                          Vérifiez la fluidité dans vos jeux ; les préférences
+                          ci-dessus restent modifiables.
                         </p>
                         <span className="pill">
                           {filled}/6 composants enregistrés
@@ -624,7 +647,11 @@ export default function App() {
                             <small>
                               {m.role === "user" ? "Vous" : "Copilot"}
                             </small>
-                            <p>{m.role === "assistant" ? cleanModelReply(m.content) : m.content}</p>
+                            <p>
+                              {m.role === "assistant"
+                                ? cleanModelReply(m.content)
+                                : m.content}
+                            </p>
                           </div>
                         ))
                       )}

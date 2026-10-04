@@ -50,3 +50,8 @@ La racine applicative reste noindex. Deux pages publiques rendues en HTML : /dec
 [WebLLM](https://webllm.mlc.ai/docs/), [Qwen léger](https://huggingface.co/Qwen/Qwen3-0.6B), [Qwen optionnel](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct), [Amazon Creators API](https://affiliate-program.amazon.com/creatorsapi/docs/en-us/introduction), [Vercel Functions](https://vercel.com/docs/functions), [Firebase Rules](https://firebase.google.com/docs/firestore/security/rules-conditions).
 
 Sur Windows avec Node 24 et des certificats réseau installés dans le système : définir `NODE_OPTIONS=--use-system-ca` avant `pnpm dev` si les requêtes HTTPS marchandes échouent. Ne jamais désactiver TLS.
+
+
+### Parcours matériel et profil conseillé
+Le bouton du dashboard lance la détection directement. En local Windows, le collecteur lit les composants ; sur le site HTTPS, WebGPU peut seulement fournir le GPU de l’adaptateur du navigateur (description parfois masquée). Aucune RAM physique ou référence CPU n’est déduite de navigator. Les champs non observés sont conservés. Les résultats sont enregistrés dans l’espace courant, sans étape « utiliser ces composants ». Import Windows et édition manuelle restent disponibles en complément.
+Le dashboard calcule un profil éditorial prudent à partir de familles GPU reconnues : 1080p/60/moyen par défaut, 1440p/60/élevé pour certaines familles supérieures, 1080p/30/bas pour des GPU intégrés explicitement reconnus. Ce ne sont ni des benchmarks ni des FPS prédits. Les GPU inconnus ne sont pas classés et le jeu, l’écran, le CPU et la température doivent être vérifiés. Aucun benchmark n’est lancé automatiquement et aucun modèle IA n’est chargé pour cette détection.
