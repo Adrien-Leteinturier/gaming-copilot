@@ -1,3 +1,12 @@
+import {
+  decodeChats,
+  encodeChats,
+  createDiscussion,
+  updateDiscussion,
+  deleteDiscussion,
+  MAX_DISCUSSIONS,
+  type ChatStore,
+} from "./discussions";
 import { readSavedReferences, keepReference } from "./prices";
 import AssistantText from "./components/AssistantText";
 import { quickReply } from "./agent/quick";
@@ -29,7 +38,7 @@ import {
   saveConfig,
   saveAlert,
   removeAlert,
-  saveMessages,
+  saveChats,
 } from "./firebase";
 import {
   configSchema,
@@ -79,9 +88,53 @@ export default function App({
   const [alerts, setAlerts] = useState<Alert[]>(() =>
     readLocal("gc.alerts", []),
   );
-  const [messages, setMessages] = useState<Message[]>(() =>
-    readLocal("gc.messages", []),
+  const [chatStore, setChatStore] = useState<ChatStore>(() =>
+    decodeChats(readLocal("gc.chats.guest", readLocal("gc.messages", []))),
   );
+  const messages =
+    chatStore.threads.find((t) => t.id === chatStore.activeId)?.messages ?? [];
+  const chatStoreRef = useRef(chatStore);
+  function restoreChats(store: ChatStore) {
+    chatStoreRef.current = store;
+    setChatStore(store);
+  }
+  async function persistChats(store: ChatStore) {
+    const uid = userUid.current;
+    const normalized = decodeChats(encodeChats(store));
+    if (uid) await saveChats(uid, normalized);
+    else
+      localStorage.setItem(
+        "gc.chats.guest",
+        JSON.stringify(encodeChats(normalized)),
+      );
+    if (userUid.current !== uid) return;
+    restoreChats(normalized);
+  }
+  async function changeDiscussion(
+    action: "new" | "select" | "delete",
+    id?: string,
+  ) {
+    if (busy || modelState === "loading") return;
+    setBusy(true);
+    try {
+      const current = chatStoreRef.current;
+      const next =
+        action === "new"
+          ? createDiscussion(current)
+          : action === "delete"
+            ? deleteDiscussion(current, id!)
+            : { ...current, activeId: id! };
+      await persistChats(next);
+      setPrompt("");
+      setPendingQuestion("");
+      setAssistantError("");
+      setLiveReply("");
+    } catch (e) {
+      report(e);
+    } finally {
+      setBusy(false);
+    }
+  }
   const [manualOpen, setManualOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -89,10 +142,13 @@ export default function App({
   const [pendingQuestion, setPendingQuestion] = useState("");
   const [assistantError, setAssistantError] = useState("");
   const chatEnd = useRef<HTMLDivElement>(null);
+  const messagesView = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (page === "Assistant")
+    if (page === "Assistant") {
+      messagesView.current?.scrollTo({ top: messagesView.current.scrollHeight, behavior: "instant" });
       chatEnd.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [page, pendingQuestion, messages, busy, assistantError]);
+    }
+  }, [page, chatStore.activeId, pendingQuestion, messages, busy, assistantError]);
   const [component, setComponent] = useState("");
   const [target, setTarget] = useState("");
   const [modelMode, setModelMode] = useState<ModelMode>(() => {
@@ -224,22 +280,27 @@ export default function App({
       try {
         if (u) {
           const data = await loadCloud(u.uid);
+          if (userUid.current !== u.uid) return;
           setConfig(data.config ?? emptyConfig);
           setDraft(data.config ?? emptyConfig);
           setAlerts(data.alerts);
-          setMessages(data.messages);
+          restoreChats(data.chatStore);
         } else {
           const local = readLocal("gc.config", emptyConfig);
           setConfig(local);
           setDraft(local);
           setAlerts(readLocal("gc.alerts", []));
-          setMessages(readLocal("gc.messages", []));
+          restoreChats(
+            decodeChats(
+              readLocal("gc.chats.guest", readLocal("gc.messages", [])),
+            ),
+          );
         }
       } catch (e) {
         setConfig(emptyConfig);
         setDraft(emptyConfig);
         setAlerts([]);
-        setMessages([]);
+        restoreChats({ threads: [], activeId: null });
         report(e);
       } finally {
         setReady(true);
@@ -359,11 +420,9 @@ export default function App({
         { role: "user" as const, content: question },
         { role: "assistant" as const, content: reply },
       ].slice(-50);
-      setMessages(next);
+      await persistChats(updateDiscussion(chatStoreRef.current, next));
       setPrompt("");
       setLiveReply("");
-      if (user) await saveMessages(user.uid, next);
-      else localStorage.setItem("gc.messages", JSON.stringify(next));
     } catch (e) {
       setAssistantError(
         e instanceof Error
@@ -647,13 +706,94 @@ export default function App({
               {page === "Assistant" && (
                 <div className="assistant-layout">
                   <section className="panel chat">
+                    <div
+                      className="discussion-bar"
+                      aria-label="Discussions enregistrées"
+                    >
+                      <div className="section-title">
+                        <strong>
+                          Discussions · {chatStore.threads.length}/
+                          {MAX_DISCUSSIONS}
+                        </strong>
+                        <button
+                          className="secondary"
+                          disabled={
+                            busy ||
+                            modelState === "loading" ||
+                            chatStore.threads.length >= MAX_DISCUSSIONS
+                          }
+                          onClick={() => void changeDiscussion("new")}
+                        >
+                          Nouvelle discussion
+                        </button>
+                      </div>
+                      <p className="muted">
+                        {user
+                          ? "Enregistrées dans votre compte."
+                          : "Enregistrées dans ce navigateur."}{" "}
+                        Retour automatique à la dernière discussion ouverte.{" "}
+                        {chatStore.threads.length >= MAX_DISCUSSIONS &&
+                          "Limite atteinte : supprimez une discussion pour en créer une autre."}
+                      </p>
+                      <div className="discussion-list">
+                        {chatStore.threads.map((thread) => (
+                          <div
+                            className={
+                              thread.id === chatStore.activeId
+                                ? "discussion-item active"
+                                : "discussion-item"
+                            }
+                            key={thread.id}
+                          >
+                            <button
+                              aria-pressed={thread.id === chatStore.activeId}
+                              disabled={busy || modelState === "loading"}
+                              onClick={() =>
+                                void changeDiscussion("select", thread.id)
+                              }
+                            >
+                              <strong>{thread.title}</strong>
+                              <small>
+                                {
+                                  thread.messages.filter(
+                                    (m) => m.role === "user",
+                                  ).length
+                                }{" "}
+                                échange(s)
+                              </small>
+                            </button>
+                            <button
+                              className="text-button"
+                              aria-label={
+                                "Supprimer la discussion " + thread.title
+                              }
+                              disabled={busy || modelState === "loading"}
+                              onClick={() =>
+                                void changeDiscussion("delete", thread.id)
+                              }
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      {!chatStore.threads.length && (
+                        <p className="muted">
+                          Votre premier échange créera une discussion.
+                        </p>
+                      )}
+                    </div>
                     <div className="chat-header">
                       <span className="brand-icon">
                         <MessageSquare />
                       </span>
                       <div>
                         <strong>Gaming Copilot</strong>
-                        <small>{modelState === "ready" ? "Conversation IA · modèle local actif" : "Conseils vérifiés · activez le modèle pour discuter"}</small>
+                        <small>
+                          {modelState === "ready"
+                            ? "Conversation IA · modèle local actif"
+                            : "Conseils vérifiés · activez le modèle pour discuter"}
+                        </small>
                       </div>
                     </div>
                     <div className="local-model-panel">
@@ -773,7 +913,7 @@ export default function App({
                         compte.
                       </small>
                     </div>
-                    <div className="messages" aria-live="polite">
+                    <div className="messages" aria-live="polite" ref={messagesView}>
                       {!messages.length ? (
                         <div className="chat-empty">
                           <MessageSquare size={38} />
@@ -939,8 +1079,9 @@ export default function App({
                     </form>
                     <small className="chat-note">
                       Le mode Conversation est conseillé pour suivre un échange.
-                      Le mode léger reste limité et les deux peuvent se tromper. Vérifiez les conseils sur les fiches
-                      constructeur. Aucun FPS mesuré n’est déduit du matériel.
+                      Le mode léger reste limité et les deux peuvent se tromper.
+                      Vérifiez les conseils sur les fiches constructeur. Aucun
+                      FPS mesuré n’est déduit du matériel.
                     </small>
                   </section>
                   <div className="panel tips">

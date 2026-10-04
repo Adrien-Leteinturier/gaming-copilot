@@ -1,3 +1,4 @@
+import { decodeChats, encodeChats, type ChatStore } from "./discussions";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -49,7 +50,7 @@ export async function loadCloud(uid: string) {
   return {
     config: pc.exists() ? (pc.data().config as PcConfig) : null,
     alerts: alerts.docs.map((d) => ({ id: d.id, ...d.data().alert }) as Alert),
-    messages: chats.exists() ? (chats.data().messages as Message[]) : [],
+    chatStore: decodeChats(chats.exists() ? chats.data().messages : []),
   };
 }
 export async function saveConfig(uid: string, config: PcConfig) {
@@ -71,10 +72,10 @@ export async function removeAlert(uid: string, id: string) {
   void uid;
   await deleteDoc(doc(db!, "priceAlerts", id));
 }
-export async function saveMessages(uid: string, messages: Message[]) {
+export async function saveChats(uid: string, store: ChatStore) {
   await setDoc(doc(db!, "conversations", uid), {
     ownerId: uid,
-    messages: messages.slice(-50),
+    messages: encodeChats(store),
     updatedAt: new Date().toISOString(),
   });
 }
